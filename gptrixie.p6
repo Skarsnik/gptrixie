@@ -1,4 +1,7 @@
 use XML;
+use GPClass;
+use DumbGenerator;
+#use OOGenerator;
 
 
 my %types;
@@ -8,209 +11,40 @@ my @cfunctions;
 my @cenums;
 my %cunions;
 
-sub MAIN($header-file, Bool :$all, Bool :$enums, Bool :$functions, Bool :$structs) {
-  do-magic($header-file);
+sub MAIN($header-file, Bool :$all, Str :$ooc, Bool :$enums, Bool :$functions, Bool :$structs, *@other) {
+  do-magic($header-file, @other);
   
+  dg-init(%types, %fields, %struct, @cfunctions, @cenums, %cunions);
+  #if $ooc {
+  #  oog-config($ooc);
+  #  oog-generate();
+  #}
   if $enums {
-    generate-enums(@cenums);
+    dg-generate-enums(@cenums);
   }
   if $functions {
-    generate-functions();
+    my %h = dg-generate-functions();
+    for %h.values -> $v {
+       say $v;
+    }
   }
   if $structs {
-    generate-structs();
-  }
-}
-
-my %ctype-to-p6 = (
-  'char' => 'int8',
-  'bool' => 'bool',
-  '_bool' => 'bool',
-  'int' => 'int32',
-  'float' => 'num32',
-  'double' => 'num64',
-  'long' => 'long',
-  'unsigned int' => 'uint32'
-).hash;
-
-role Type {
-  has	$.id is rw;
-}
-
-class DirectType does Type {
-  has	$.name is rw;
-  method Str {
-    $!name;
-  }
-}
-
-class IndirectType does Type {
-  has	$.ref-id is rw;
-  has	Type $.ref-type is rw;
-}
-
-class PointerType is IndirectType {
-  method Str {
-    return $.ref-type.Str ~ '*';
-  }
-}
-
-class StructType is DirectType {
-}
-
-class FundamentalType is DirectType {
-}
-
-class QualifiedType is IndirectType {
-  method Str {
-    return 'const ' ~ $.ref-type.Str;
-  }
-}
-
-class TypeDefType is IndirectType {
-  has $.name is rw;
-  method Str {
-    return "Typedef($!name)->" ~  $.ref-type.Str;
-  }
-}
-
-class UnionType is DirectType {
-  method Str {
-    'Union'
-  }
-}
-
-class FunctionType is DirectType {
-  method Str {
-    'PtrFunc';
-  }
-}
-
-class EnumType is DirectType {
-}
-
-
-sub	resolve-type($t) {
-  if $t ~~ PointerType {
-    return 'Str' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'char' ||
-      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
-    return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
-      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
-    return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
-  }
-  if $t ~~ FundamentalType {
-    return %ctype-to-p6{$t.name};
-  }
-  if $t ~~ EnumType {
-    return 'int32';
-  }
-  if $t ~~ StructType {
-    return $t.name;
-  }
-  if $t ~~ QualifiedType {
-    return resolve-type($t.ref-type);
-  }
-  if $t ~~ TypeDefType {
-    return 'size_t' if $t.name eq 'size_t';
-    return resolve-type($t.ref-type);
-  }
-  if $t ~~ UnionType {
-    return %cunions{$t.id}.gen-name;
-  }
-  return 'NYI';
-}
-
-sub generate-functions {
-  for @cfunctions -> $f {
-    my @tmp;
-    for $f.arguments -> $a {
-      @tmp.push(resolve-type($a.type) ~ ' ' ~ $a.name);
+    my %h = dg-generate-structs();
+    for %h.values -> $v {
+       say $v;
     }
-    my $returns = $f.returns ~~ FundamentalType && $f.returns.name eq 'void' ?? '' !!
-           "returns " ~ resolve-type($f.returns);
-    say "sub {$f.name} is native(LIB) $returns (" ~ @tmp.join(', ') ~ ') { * }';
-  }
-}
-
-sub generate-enums (@enum) {
-  for @enum -> $e {
-    say 'enum ' ~ $e.name ~ ' is export = (';
-    my @tmp;
-    for @($e.values) -> $v {
-      @tmp.push("   " ~ $v.name ~ " => " ~ $v.init);
-    }
-    say @tmp.join(",\n");
-    say ");";
-  }
-}
-
-sub generate-structs {
-  for %cunions.kv -> $k, $cu {
-    say "class {$cu.gen-name} is repr('CUnion') is export \{";
-    for $cu.members -> $m {
-      my $has = ($m.type ~~ StructType) ?? 'HAS' !! 'has';
-      say "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ ';';
-    }
-    say "}";
-  }
-  for %struct.kv -> $k, $s {
-    say "class {$s.name} is repr('CStruct') is export \{";
-    for $s.fields -> $field {
-      my $has = ($field.type ~~ StructType | UnionType) ?? 'HAS' !! 'has';
-      say "\t$has " ~ resolve-type($field.type) ~ "\t" ~ $field.name ~ ';';
-    }
-    say "}";
   }
 }
 
 
-class Field is rw {
-  has	$.name;
-  has	$.type-id;
-  has	Type $.type;
-}
 
-class Struct is rw {
-  has	$.name;
-  has	$.id;
-  has	Field @.fields;
-}
 
-class EnumValue is rw {
-  has	$.name;
-  has	$.init,
-}
 
-class CEnum is rw {
-  has	$.name;
-  has	$.id;
-  has	EnumValue @.values;
-}
 
-class FunctionArgument is rw {
-  has		$.name;
-  has Type 	$.type;
-}
-
-class Function is rw {
-  has	$.id;
-  has	$.name;
-  has	Type $.returns;
-  has	FunctionArgument @.arguments;
-}
-
-class CUnion is rw {
-  has	$.id;
-  has   $.field;
-  has   $.struct;
-  has   @.members;
-  has   $.gen-name;
-}
-
-sub do-magic($header) {
+sub do-magic($header, @other) {
 
   say "gccxml $header -fxml=plop.xml";
-  run "gccxml",  $header, "-fxml=plop.xml";
+  run "gccxml",  $header, "-fxml=plop.xml", @other;
 
   my $xml = from-xml-file('plop.xml');
 

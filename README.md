@@ -7,6 +7,6 @@ of have sure the gccxml executable is gccxml
 
 use it like this :
 
-perl gptrixie.p6 --enums --structs --functions path/myheader.h
+perl6 -I . gptrixie.p6 --enums --structs --functions path/myheader.h
 
 Try to not copy the header if it use other one.
