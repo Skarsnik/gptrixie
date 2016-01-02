@@ -66,7 +66,7 @@ sub dg-generate-functions is export {
   for @cfunctions -> $f {
     my @tmp = ();
     for $f.arguments -> $a {
-      @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? $a.name !! ''));
+      @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? '$' ~ $a.name !! ''));
     }
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
@@ -104,7 +104,7 @@ sub dg-generate-structs is export {
     $p6gen = "class {$s.name} is repr('CStruct') is export \{\n";
     for $s.fields -> $field {
       my $has = ($field.type ~~ StructType | UnionType) ?? 'HAS' !! 'has';
-      $p6gen ~= "\t$has " ~ resolve-type($field.type) ~ "\t" ~ $field.name ~ ";\n";
+      $p6gen ~= "\t$has " ~ resolve-type($field.type) ~ "\t\$." ~ $field.name ~ ";\n";
     }
     $p6gen ~= "}";
     %toret{$s.name} = $p6gen;
