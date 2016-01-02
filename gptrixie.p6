@@ -6,6 +6,7 @@ my %fields;
 my %struct;
 my @cfunctions;
 my @cenums;
+my %cunions;
 
 sub MAIN($header-file, Bool :$all, Bool :$enums, Bool :$functions, Bool :$structs) {
   do-magic($header-file);
@@ -113,6 +114,9 @@ sub	resolve-type($t) {
     return 'size_t' if $t.name eq 'size_t';
     return resolve-type($t.ref-type);
   }
+  if $t ~~ UnionType {
+    return %cunions{$t.id}.gen-name;
+  }
   return 'NYI';
 }
 
@@ -141,6 +145,14 @@ sub generate-enums (@enum) {
 }
 
 sub generate-structs {
+  for %cunions.kv -> $k, $cu {
+    say "class {$cu.gen-name} is repr('CUnion') is export \{";
+    for $cu.members -> $m {
+      my $has = ($m.type ~~ StructType) ?? 'HAS' !! 'has';
+      say "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ ';';
+    }
+    say "}";
+  }
   for %struct.kv -> $k, $s {
     say "class {$s.name} is repr('CStruct') is export \{";
     for $s.fields -> $field {
@@ -187,6 +199,14 @@ class Function is rw {
   has	FunctionArgument @.arguments;
 }
 
+class CUnion is rw {
+  has	$.id;
+  has   $.field;
+  has   $.struct;
+  has   @.members;
+  has   $.gen-name;
+}
+
 sub do-magic($header) {
 
   say "gccxml $header -fxml=plop.xml";
@@ -216,12 +236,6 @@ sub do-magic($header) {
     %types{$t.id} = $t;
   }
 
-  #Need futher work
-  for @xmlUnion -> $ft {
-    my UnionType $t .= new(:id($ft.attribs<id>));
-    %types{$t.id} = $t;
-  }
-
   for @xmlPointertypes -> $ft {
     my PointerType $t .= new(:id($ft.attribs<id>));
     $t.ref-id = $ft.attribs<type>;
@@ -248,7 +262,7 @@ sub do-magic($header) {
     $pf.type-id = $field.attribs<type>;
     %fields{$field.attribs<id>} = $pf;
   }
-
+  
   my @xmlStruct = $xml.lookfor(:TAG<Struct>);
 
   for @xmlStruct -> $xmls {
@@ -264,6 +278,18 @@ sub do-magic($header) {
     %types{$t.id} = $t;
   }
 
+  for @xmlUnion -> $ft {
+    my UnionType $t .= new(:id($ft.attribs<id>));
+    %types{$t.id} = $t;
+    my CUnion $u .= new(:id($ft.attribs<id>));
+    my @rm = $ft.attribs<members>.split(' ');
+    for @rm -> $rm {
+      $u.members.push(%fields{$rm}) if %fields{$rm}:exists;
+    }
+    $u.struct = %struct{$ft.attribs<context>};
+    %cunions{$u.id} = $u;
+    
+  }
 
   my @xmlenum = $xml.lookfor(:TAG<Enumeration>);
 
@@ -315,6 +341,13 @@ sub do-magic($header) {
 
   for %fields.kv ->  $id, $f {
     $f.type = %types{$f.type-id};
+    if $f.type ~~ UnionType {
+      %cunions{$f.type.id}.field = $f;
+    }
+  }
+  for %cunions.kv -> $k, $cu {
+    $cu.gen-name = $cu.struct.name ~ "_" ~ $cu.field.name ~ "_Union";
+    say $cu.gen-name;
   }
 
 }
