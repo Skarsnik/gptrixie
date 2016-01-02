@@ -64,11 +64,11 @@ sub	resolve-type($t) is export {
 sub dg-generate-functions is export {
   my %toret;
   for @cfunctions -> $f {
-    my @tmp;
+    my @tmp = ();
     for $f.arguments -> $a {
-      @tmp.push(resolve-type($a.type) ~ ' ' ~ $a.name);
+      @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? $a.name !! ''));
     }
-    my $returns = $f.returns ~~ FundamentalType && $f.returns.name eq 'void' ?? '' !!
+    my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
     my $p6gen = "sub {$f.name} is native(LIB) $returns (" ~ @tmp.join(', ') ~ ') { * }';
     %toret{$f.name} = $p6gen;

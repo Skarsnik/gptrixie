@@ -54,6 +54,7 @@ sub do-magic($header, @other) {
   my @xmlQualtypes = $xml.lookfor(:TAG<CvQualifiedType>);
   my @xmlTypesdef = $xml.lookfor(:TAG<Typedef>);
   my @xmlFunctionTypes = $xml.lookfor(:TAG<FunctionType>);
+  my @xmlArrayTypes = $xml.lookfor(:TAG<ArrayType>);
   my @xmlUnion = $xml.lookfor(:TAG<Union>);
   my @xmlFunctions = $xml.lookfor(:TAG<Function>, :name(* !~~ /^__/));
 
@@ -88,7 +89,11 @@ sub do-magic($header, @other) {
     $t.name = $ft.attribs<name>;
     %types{$t.id} = $t;
   }
-
+  for @xmlArrayTypes -> $ft {
+    my ArrayType $t .= new(:id($ft.attribs<id>));
+    $t.ref-id = $ft.attribs<type>;
+    %types{$t.id} = $t;
+  }
 
   for @xmlfields -> $field {
     my $pf = Field.new();
@@ -103,9 +108,11 @@ sub do-magic($header, @other) {
     my $s = Struct.new;
     $s.name = $xmls.attribs<name>;
     $s.id = $xmls.attribs<id>;
-    my @rawmember = $xmls.attribs<members>.split(' ');
-    for @rawmember {
-      $s.fields.push(%fields{$_}) if %fields{$_}.defined;
+    if $xmls.attribs<members>.defined {
+      my @rawmember = $xmls.attribs<members>.split(' ');
+      for @rawmember {
+        $s.fields.push(%fields{$_}) if %fields{$_}.defined;
+      }
     }
     %struct{$s.id} = $s;
     my StructType $t .= new(:id($s.id), :name($s.name));
@@ -161,6 +168,7 @@ sub do-magic($header, @other) {
     my Function $f .= new(:name($func.attribs<name>), :id($func.attribs<id>));
     $f.returns = %types{$func.attribs<returns>};
     for @($func.elements()) -> $param {
+      next if $param.name ne 'Argument';
       my FunctionArgument $a .= new(:name($param.attribs<name>));
       $a.type = %types{$param.attribs<type>};
       $f.arguments.push($a);

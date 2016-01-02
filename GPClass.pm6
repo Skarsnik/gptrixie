@@ -27,6 +27,12 @@ class StructType is DirectType is export {
 class FundamentalType is DirectType is export {
 }
 
+class ArrayType is IndirectType is export {
+  method Str {
+    return '[]' ~ $.ref-type.Str;
+  }
+}
+
 class QualifiedType is IndirectType is export {
   method Str {
     return 'const ' ~ $.ref-type.Str;
