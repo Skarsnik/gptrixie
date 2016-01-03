@@ -1,4 +1,4 @@
-module GPClass {
+module GPT::Class {
 role Type is export {
   has	$.id is rw;
 }

@@ -1,6 +1,6 @@
-use GPClass;
+use GPT::Class;
 
-module DumbGenerator {
+module GPT::DumbGenerator {
 
 my %types;
 my %fields;
@@ -26,7 +26,8 @@ my %ctype-to-p6 = (
   'float' => 'num32',
   'double' => 'num64',
   'long' => 'long',
-  'unsigned int' => 'uint32'
+  'unsigned int' => 'uint32',
+  'unsigned char' => 'uint8'
 ).hash;
 
 
@@ -37,7 +38,9 @@ sub	resolve-type($t) is export {
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
     return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
+    return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
     return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
+    
   }
   if $t ~~ FundamentalType {
     return %ctype-to-p6{$t.name};
@@ -53,6 +56,7 @@ sub	resolve-type($t) is export {
   }
   if $t ~~ TypeDefType {
     return 'size_t' if $t.name eq 'size_t';
+    return $t.name if $t.ref-type ~~ FundamentalType;
     return resolve-type($t.ref-type);
   }
   if $t ~~ UnionType {

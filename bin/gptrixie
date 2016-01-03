@@ -1,6 +1,6 @@
 use XML;
-use GPClass;
-use DumbGenerator;
+use GPT::Class;
+use GPT::DumbGenerator;
 #use OOGenerator;
 
 
