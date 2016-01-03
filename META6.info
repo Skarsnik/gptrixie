@@ -9,5 +9,5 @@
         "GPT::DumbGenerator"     : "lib/GPT/DumbGenerator.pm6",
         "gptrixie"		 : "bin/gptrixie"
     },
-    "source-url"    : "git://github.com/skarsnik/gptrixie.git"
+    "source-url"    : "git://github.com/Skarsnik/gptrixie.git"
 }
