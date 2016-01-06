@@ -1,4 +1,6 @@
 module GPT::Class {
+
+#Type class. they only represent a Type
 role Type is export {
   has	$.id is rw;
 }
@@ -28,8 +30,9 @@ class FundamentalType is DirectType is export {
 }
 
 class ArrayType is IndirectType is export {
+  has	$.size = '';
   method Str {
-    return '[]' ~ $.ref-type.Str;
+    return $.ref-type.Str ~ "[$!size]";
   }
 }
 
@@ -42,7 +45,7 @@ class QualifiedType is IndirectType is export {
 class TypeDefType is IndirectType is export {
   has $.name is rw;
   method Str {
-    return "Typedef($!name)->" ~  $.ref-type.Str;
+    return "Typedef($!name)->|" ~  $.ref-type.Str ~ "|";
   }
 }
 
@@ -61,13 +64,28 @@ class FunctionType is DirectType is export {
 class EnumType is DirectType is export {
 }
 
-class Field is rw  is export {
+
+# Real class
+
+# to keep track of the location
+role CLocation is rw is export {
+  has	$.file-id;
+  has	$.file;
+  has	$.start-line;
+  
+  method set-clocation($elem) {
+    $!file-id = $elem.attribs<file>;
+    $!start-line = $elem.attribs<line>;
+  }
+}
+
+class Field does CLocation is rw is export {
   has	$.name;
   has	$.type-id;
   has	Type $.type;
 }
 
-class Struct is rw is export {
+class Struct does CLocation is rw is export {
   has	$.name;
   has	$.id;
   has	Field @.fields;
@@ -78,30 +96,39 @@ class EnumValue is rw is export {
   has	$.init,
 }
 
-class CEnum is rw is export {
+class CEnum does CLocation is rw is export {
   has	$.name;
   has	$.id;
   has	EnumValue @.values;
 }
 
-class FunctionArgument is rw is export {
+class FunctionArgument does CLocation is rw is export {
   has		$.name;
   has Type 	$.type;
 }
 
-class Function is rw is export {
+class Function does CLocation is rw is export {
   has	$.id;
   has	$.name;
   has	Type $.returns;
   has	FunctionArgument @.arguments;
 }
 
-class CUnion is rw is export {
+class CUnion does CLocation is rw is export {
   has	$.id;
   has   $.field;
   has   $.struct;
   has   @.members;
   has   $.gen-name;
 }
-  
+
+class AllTheThings is rw is export {
+  has	@.functions;
+  has	%.types;
+  has	@.enums;
+  has	%.structs;
+  has	%.files;
+  has	%.unions;
+}
+
 }

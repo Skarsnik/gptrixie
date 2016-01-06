@@ -4,31 +4,54 @@ use GPT::DumbGenerator;
 #use OOGenerator;
 
 
-my %types;
-my %fields;
-my %struct;
-my @cfunctions;
-my @cenums;
-my %cunions;
 
-sub MAIN($header-file, Bool :$all, Str :$ooc, Bool :$enums, Bool :$functions, Bool :$structs, *@other) {
-  do-magic($header-file, @other);
+
+
+
+sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, Bool :$functions, Bool :$structs, *@other) {
+
+  if $define-enum.defined and ! $define-enum.index(':').defined {
+      die "The define-enum option must be of the form enumname:pattern";
+  }
+  my AllTheThings $att = do-magic($header-file, @other);
+  note "Time to generate stuff\n\n";
   
-  dg-init(%types, %fields, %struct, @cfunctions, @cenums, %cunions);
+  
   #if $ooc {
   #  oog-config($ooc);
   #  oog-generate();
   #}
-  if $enums {
-    dg-generate-enums(@cenums);
+  if $define-enum {
+    my ($enum-name, $enum-pattern) := $define-enum.split(':');
+    my CEnum $e .= new(:name($enum-name), :id(-1));
+    for $att.files.kv -> $k, $v {
+      if $v.IO.basename ne 'gccxml_builtins.h' and $v.IO.basename !~~ /^std/ {
+        my $fh = open $v;
+        for $fh.lines -> $line {
+          if $line ~~ /^"#"\s*"define" \s+ ($enum-pattern.+) \s+ (.+)/ {
+            my EnumValue $ev .= new;
+            $ev.name = $0;
+            $ev.init = $1;
+            $e.values.push($ev);
+          }
+        }
+      }
+    }
+    if $e.values.elems !== 0 {
+      $att.enums.push($e);
+    }    
   }
-  if $functions {
+  dg-init($att);
+  if $enums or $all or $define-enum {
+    dg-generate-enums();
+  }
+  if $functions or $all {
     my %h = dg-generate-functions();
     for %h.values -> $v {
        say $v;
     }
   }
-  if $structs {
+  if $structs or $all {
     my %h = dg-generate-structs();
     for %h.values -> $v {
        say $v;
@@ -42,12 +65,27 @@ sub MAIN($header-file, Bool :$all, Str :$ooc, Bool :$enums, Bool :$functions, Bo
 
 
 sub do-magic($header, @other) {
+  my %types;
+  my %fields;
+  my %struct;
+  my @cfunctions;
+  my @cenums;
+  my %cunions;
+  my %files;
+  
+  my %times;
 
-  say "gccxml $header -fxml=plop.xml";
+  my $t = now;
+  note "Calling GCCXML : gccxml $header -fxml=plop.xml";
   run "gccxml",  $header, "-fxml=plop.xml", @other;
-
+  %times<gccxml> = now - $t;
+  $t = now;
+  note "Parsing the XML file";
   my $xml = from-xml-file('plop.xml');
-
+  %times<parse-xml> = now - $t;
+  $t = now;
+  note "Doing magic";
+  my @xmlFiles = $xml.lookfor(:TAG<File>);
   my @xmlfields = $xml.lookfor(:TAG<Field>);
   my @xmlFundtypes = $xml.lookfor(:TAG<FundamentalType>);
   my @xmlPointertypes = $xml.lookfor(:TAG<PointerType>);
@@ -57,6 +95,10 @@ sub do-magic($header, @other) {
   my @xmlArrayTypes = $xml.lookfor(:TAG<ArrayType>);
   my @xmlUnion = $xml.lookfor(:TAG<Union>);
   my @xmlFunctions = $xml.lookfor(:TAG<Function>, :name(* !~~ /^__/));
+
+  for @xmlFiles -> $ft {
+    %files{$ft.attribs<id>} = $ft.attribs<name>;
+  }
 
 
   #Gather type
@@ -90,13 +132,18 @@ sub do-magic($header, @other) {
     %types{$t.id} = $t;
   }
   for @xmlArrayTypes -> $ft {
-    my ArrayType $t .= new(:id($ft.attribs<id>));
+    my $size = $ft.attribs<max>.subst('u', '') eq "0xffffffffffffffff" ?? '' !! $ft.attribs<max>.subst('u', '') + 1;   
+    my ArrayType $t .= new(:id($ft.attribs<id>), :size($size));
     $t.ref-id = $ft.attribs<type>;
     %types{$t.id} = $t;
   }
 
+  #Gather 'real' stuff
+  
   for @xmlfields -> $field {
     my $pf = Field.new();
+    $pf.set-clocation($field);
+    $pf.file = %files{$pf.file-id};
     $pf.name = $field.attribs<name>;
     $pf.type-id = $field.attribs<type>;
     %fields{$field.attribs<id>} = $pf;
@@ -108,6 +155,8 @@ sub do-magic($header, @other) {
     my $s = Struct.new;
     $s.name = $xmls.attribs<name>;
     $s.id = $xmls.attribs<id>;
+    $s.set-clocation($xmls);
+    $s.file = %files{$s.file-id};
     if $xmls.attribs<members>.defined {
       my @rawmember = $xmls.attribs<members>.split(' ');
       for @rawmember {
@@ -139,6 +188,8 @@ sub do-magic($header, @other) {
     my CEnum $enum .= new(:id($m.attribs<id>), :name($m.attribs<name>));
     my EnumType $t .= new(:id($m.attribs<id>), :name($m.attribs<name>));
     %types{$t.id} = $t;
+    $enum.set-clocation($m);
+    $enum.file = %files{$enum.file-id};
     for @($m.elements()) -> $enumv {
       my EnumValue $nv .= new(:name($enumv.attribs<name>), :init($enumv.attribs<init>));
       $enum.values.push($nv);
@@ -167,9 +218,13 @@ sub do-magic($header, @other) {
   for @xmlFunctions -> $func {
     my Function $f .= new(:name($func.attribs<name>), :id($func.attribs<id>));
     $f.returns = %types{$func.attribs<returns>};
+    $f.set-clocation($func);
+    $f.file = %files{$f.file-id};
     for @($func.elements()) -> $param {
       next if $param.name ne 'Argument';
       my FunctionArgument $a .= new(:name($param.attribs<name>));
+      $a.set-clocation($param);
+      $a.file = %files{$a.file-id};
       $a.type = %types{$param.attribs<type>};
       $f.arguments.push($a);
     }
@@ -189,9 +244,18 @@ sub do-magic($header, @other) {
   }
   for %cunions.kv -> $k, $cu {
     $cu.gen-name = $cu.struct.name ~ "_" ~ $cu.field.name ~ "_Union";
-    say $cu.gen-name;
   }
-
+  
+  %times<magic> = now - $t;
+  note "Times -- gccxml: %times<gccxml> sec; xml parsing: %times<parse-xml> sec; magic: %times<magic>";
+   my $att = AllTheThings.new;
+   $att.files = %files;
+   $att.types = %types;
+   $att.functions = @cfunctions;
+   $att.enums = @cenums;
+   $att.structs = %struct;
+   $att.unions = %cunions;
+   return $att;
 }
 
 # say "\n==CSTRUCT==";

@@ -2,20 +2,10 @@ use GPT::Class;
 
 module GPT::DumbGenerator {
 
-my %types;
-my %fields;
-my %struct;
-my @cfunctions;
-my @cenums;
-my %cunions;
+my AllTheThings	$allthings;
 
-sub dg-init(%t, %f, %s, @cf, @ce, %u) is export {
-  %types = %t;
-  %fields = %f;
-  %struct = %s;
-  @cfunctions = @cf;
-  @cenums = @ce;
-  %cunions = %u;
+sub dg-init($allt) is export {
+  $allthings = $allt;
 }
 
 my %ctype-to-p6 = (
@@ -42,6 +32,9 @@ sub	resolve-type($t) is export {
     return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
     
   }
+  if $t ~~ ArrayType {
+    return 'CArray[' ~ resolve-type($t.ref-type) ~ ']';
+  }
   if $t ~~ FundamentalType {
     return %ctype-to-p6{$t.name};
   }
@@ -60,28 +53,28 @@ sub	resolve-type($t) is export {
     return resolve-type($t.ref-type);
   }
   if $t ~~ UnionType {
-    return %cunions{$t.id}.gen-name;
+    return $allthings.unions{$t.id}.gen-name;
   }
-  return 'NYI';
+  return 'NYI(' ~ $t.Str ~ ')';
 }
 
 sub dg-generate-functions is export {
   my %toret;
-  for @cfunctions -> $f {
+  for $allthings.functions -> $f {
     my @tmp = ();
     for $f.arguments -> $a {
       @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? '$' ~ $a.name !! ''));
     }
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
-    my $p6gen = "sub {$f.name} is native(LIB) $returns (" ~ @tmp.join(', ') ~ ') { * }';
+    my $p6gen = "sub {$f.name} is native(LIB) $returns (" ~ @tmp.join(', ') ~ ') is export { * }';
     %toret{$f.name} = $p6gen;
   }
   return %toret;
 }
 
-sub dg-generate-enums(@enum) is export {
-  for @enum -> $e {
+sub dg-generate-enums() is export {
+  for $allthings.enums -> $e {
     say 'enum ' ~ $e.name ~ ' is export = (';
     my @tmp;
     for @($e.values) -> $v {
@@ -95,20 +88,21 @@ sub dg-generate-enums(@enum) is export {
 sub dg-generate-structs is export {
   my %toret;
   my $p6gen;
-  for %cunions.kv -> $k, $cu {
+  for $allthings.unions.kv -> $k, $cu {
     $p6gen = "class {$cu.gen-name} is repr('CUnion') is export \{\n";
     for $cu.members -> $m {
       my $has = ($m.type ~~ StructType) ?? 'HAS' !! 'has';
-      $p6gen ~= "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ ";\n";
+      $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($m.type), $m.name, $m.type, $m.name);
+      #$p6gen ~= "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ "; # " ~ $m.type ~ ' ' ~ $m.name ~ "\n";
     }
     $p6gen ~= "}";
     %toret{$cu.gen-name} = $p6gen;
   }
-  for %struct.kv -> $k, $s {
+  for $allthings.structs.kv -> $k, $s {
     $p6gen = "class {$s.name} is repr('CStruct') is export \{\n";
     for $s.fields -> $field {
       my $has = ($field.type ~~ StructType | UnionType) ?? 'HAS' !! 'has';
-      $p6gen ~= "\t$has " ~ resolve-type($field.type) ~ "\t\$." ~ $field.name ~ ";\n";
+      $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($field.type), $field.name, $field.type, $field.name);
     }
     $p6gen ~= "}";
     %toret{$s.name} = $p6gen;
