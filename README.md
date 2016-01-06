@@ -2,20 +2,23 @@
 A tool to generate NativeCall code from C headers
 
 You will need gccxml and gcc/g++ 4.9
-Beware some distrib provide gccxml as castxml and it sucks, you will need to change the code to use gccxml.real
+Beware some distrib provide gccxml as castxml and it's bad (does not want to take c99 headers), you will need to change the code to use gccxml.real
 of have sure the gccxml executable is gccxml
 
 use it like this :
 
-perl6 -I . gptrixie.p6 --enums --structs --functions path/myheader.h
+ `gptrixie --enums --structs --functions path/myheader.h`
 
-Try to not copy the header if it use other one.
+Try to keep the header at his original location if it include other
 
+There is also a define-enum option to generate enum from #define
+
+ --define-enum=EnumName:Definepattern
 
 # Example
 
 
-t@testperl6:~/piko/gptrixie# perl6  -I lib bin/gptrixie --functions --enums --structs /usr/local/include/gumbo.h 
+ t@testperl6:~/piko/gptrixie# perl6  -I lib bin/gptrixie --functions --enums --structs /usr/local/include/gumbo.h 
 
 ```perl
 enum GumboNamespaceEnum is export = (
