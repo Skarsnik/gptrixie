@@ -71,8 +71,8 @@ class EnumType is DirectType is export {
 role CLocation is rw is export {
   has	$.file-id;
   has	$.file;
-  has	$.start-line;
-  
+  has	$.start-line;     # this is really the *end* line for some reason
+
   method set-clocation($elem) {
     $!file-id = $elem.attribs<file>;
     $!start-line = $elem.attribs<line>;
@@ -120,6 +120,8 @@ class CUnion does CLocation is rw is export {
   has   $.struct;
   has   @.members;
   has   $.gen-name;
+
+  #method Str { "[id=$id field=$field struct=$struct" }
 }
 
 class AllTheThings is rw is export {

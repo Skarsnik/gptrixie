@@ -8,15 +8,15 @@ use GPT::DumbGenerator;
 
 
 
-sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, Bool :$functions, Bool :$structs, *@other) {
+sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, Bool :$functions, Bool :$structs, Str :$func-prefix, *@other) {
 
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
   my AllTheThings $att = do-magic($header-file, @other);
   note "Time to generate stuff\n\n";
-  
-  
+
+
   #if $ooc {
   #  oog-config($ooc);
   #  oog-generate();
@@ -39,7 +39,7 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
     }
     if $e.values.elems !== 0 {
       $att.enums.push($e);
-    }    
+    }
   }
   dg-init($att);
   if $enums or $all or $define-enum {
@@ -47,8 +47,12 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
   }
   if $functions or $all {
     my %h = dg-generate-functions();
-    for %h.values -> $v {
-       say $v;
+    for %h.keys.sort -> $func-name {
+      my $sub-def = %h{$func-name};
+      if $func-prefix && ! $func-name.starts-with($func-prefix) {
+        next;
+      }
+      say $sub-def;
     }
   }
   if $structs or $all {
@@ -72,7 +76,7 @@ sub do-magic($header, @other) {
   my @cenums;
   my %cunions;
   my %files;
-  
+
   my %times;
 
   my $t = now;
@@ -86,6 +90,7 @@ sub do-magic($header, @other) {
   $t = now;
   note "Doing magic";
   my @xmlFiles = $xml.lookfor(:TAG<File>);
+  #say '@xmlFiles: ' ~ @xmlFiles;
   my @xmlfields = $xml.lookfor(:TAG<Field>);
   my @xmlFundtypes = $xml.lookfor(:TAG<FundamentalType>);
   my @xmlPointertypes = $xml.lookfor(:TAG<PointerType>);
@@ -132,14 +137,14 @@ sub do-magic($header, @other) {
     %types{$t.id} = $t;
   }
   for @xmlArrayTypes -> $ft {
-    my $size = $ft.attribs<max>.subst('u', '') eq "0xffffffffffffffff" ?? '' !! $ft.attribs<max>.subst('u', '') + 1;   
+    my $size = $ft.attribs<max>.subst('u', '') eq "0xffffffffffffffff" ?? '' !! $ft.attribs<max>.subst('u', '') + 1;
     my ArrayType $t .= new(:id($ft.attribs<id>), :size($size));
     $t.ref-id = $ft.attribs<type>;
     %types{$t.id} = $t;
   }
 
   #Gather 'real' stuff
-  
+
   for @xmlfields -> $field {
     my $pf = Field.new();
     $pf.set-clocation($field);
@@ -148,7 +153,7 @@ sub do-magic($header, @other) {
     $pf.type-id = $field.attribs<type>;
     %fields{$field.attribs<id>} = $pf;
   }
-  
+
   my @xmlStruct = $xml.lookfor(:TAG<Struct>);
 
   for @xmlStruct -> $xmls {
@@ -178,7 +183,7 @@ sub do-magic($header, @other) {
     }
     $u.struct = %struct{$ft.attribs<context>};
     %cunions{$u.id} = $u;
-    
+
   }
 
   my @xmlenum = $xml.lookfor(:TAG<Enumeration>);
@@ -243,9 +248,15 @@ sub do-magic($header, @other) {
     }
   }
   for %cunions.kv -> $k, $cu {
+    if ! $cu.struct.defined || ! $cu.field.defined {
+        warn "Got a weird cunion";
+        next;
+    }
+    say 'cu struct name = ' ~ $cu.struct.name;
+    say 'cu field name = ' ~ $cu.field.name;
     $cu.gen-name = $cu.struct.name ~ "_" ~ $cu.field.name ~ "_Union";
   }
-  
+
   %times<magic> = now - $t;
   note "Times -- gccxml: %times<gccxml> sec; xml parsing: %times<parse-xml> sec; magic: %times<magic>";
    my $att = AllTheThings.new;
@@ -265,9 +276,9 @@ sub do-magic($header, @other) {
 #     say "   {$f.type.Str} ({$f.type-id})  '{$f.name}'";
 #   }
 # }
-# 
+#
 # say "==FUNCTIONS==";
-# 
+#
 # for @cfunctions -> $f {
 #   my @tmp;
 #   for $f.arguments -> $a {

@@ -9,28 +9,69 @@ sub dg-init($allt) is export {
 }
 
 my %ctype-to-p6 = (
-  'char' => 'int8',
-  'bool' => 'bool',
-  '_bool' => 'bool',
-  'int' => 'int32',
-  'float' => 'num32',
-  'double' => 'num64',
-  'long' => 'long',
-  'unsigned int' => 'uint32',
-  'unsigned char' => 'uint8'
+  'bool'            => 'bool',
+  '_bool'           => 'bool',
+
+  'char'            => 'int8',
+  'unsigned char'   => 'uint8',
+
+  'short'           => 'int16',
+  'unsigned short'  => 'uint16',
+
+  'int'             => 'int32',
+  'unsigned int'    => 'uint32',
+
+  'float'           => 'num32',
+  'double'          => 'num64',
+
+  'long'            => 'long',
+  'long int'        => 'long',
+  'unsigned long'   => 'ulong',
+  'unsigned long int' => 'ulong',
+
+  'long long'       => 'longlong',
+  'long long int'   => 'longlong',
+
+  'unsigned long long'      => 'ulonglong',
+  'unsigned long long int'  => 'ulonglong',
+  'long long unsigned int'  => 'ulonglong',
+
 ).hash;
 
+my %stdinttype-to-p6 = (
+  # Fixed width types from stdint.h
+  'int8_t'          => 'int8',
+  'int16_t'         => 'int16',
+  'int32_t'         => 'int32',
+  'int64_t'         => 'int64',
+
+  'uint8_t'         => 'uint8',
+  'uint16_t'        => 'uint16',
+  'uint32_t'        => 'uint32',
+  'uint64_t'        => 'uint64',
+).hash;
 
 
 sub	resolve-type($t) is export {
   if $t ~~ PointerType {
+    #say '$t.ref-type = ' ~ $t.ref-type;
+
     return 'Str' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'char' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
+
+    # For now: Pointer (and maybe nativecast it later)
     return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
+
+    # return 'Buf' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
+    #  $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
+
+    # Use Buf for unsigned char *
+    return 'Buf' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'unsigned char' ||
+      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'unsigned char';
+
     return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
     return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
-    
   }
   if $t ~~ ArrayType {
     return 'CArray[' ~ resolve-type($t.ref-type) ~ ']';
@@ -48,7 +89,10 @@ sub	resolve-type($t) is export {
     return resolve-type($t.ref-type);
   }
   if $t ~~ TypeDefType {
+    #say 'got typedeftype, $t = ' ~ $t;
+    #say '--> $t.name = ' ~ $t.name;
     return 'size_t' if $t.name eq 'size_t';
+    return %stdinttype-to-p6{$t.name} if %stdinttype-to-p6{$t.name};
     return $t.name if $t.ref-type ~~ FundamentalType;
     return resolve-type($t.ref-type);
   }
@@ -57,6 +101,19 @@ sub	resolve-type($t) is export {
   }
   return 'NYI(' ~ $t.Str ~ ')';
 }
+
+sub get-def($file, $line) {
+    my @def-lines;
+    my @file-lines = $file.IO.lines;
+    my $i = $line - 1;
+
+    while @file-lines[$i].chars > 0 {
+        @def-lines.push(@file-lines[$i]);
+        $i--;
+    }
+    @def-lines.reverse
+}
+
 
 sub dg-generate-functions is export {
   my %toret;
@@ -67,7 +124,31 @@ sub dg-generate-functions is export {
     }
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
-    my $p6gen = "sub {$f.name} is native(LIB) $returns (" ~ @tmp.join(', ') ~ ') is export { * }';
+    my $args = @tmp.join(', ');
+    my $p6gen;
+
+    # Add commented definition above sub
+    #$p6gen ~= "file: " ~ $f.file;
+    #$p6gen ~= "start-ling: " ~ $f.start-line;
+
+    my $function-def = get-def($f.file, $f.start-line).map({ "# $_" }).join("\n") ~ "\n";
+    $p6gen ~= $function-def;
+
+    $p6gen ~= "sub {$f.name}($args)\n";
+    if $returns {
+        $p6gen ~= qq:to/END/;
+            $returns
+        END
+    }
+    $p6gen ~= qq:to/END/;
+        is native(LIB)
+        is export
+        \{ * \}
+    END
+
+    #"sub {$f.name}(" ~  ~ ")\n"\
+    #"" is native(LIB) $returns ("  ~ ') is export { * }';
+
     %toret{$f.name} = $p6gen;
   }
   return %toret;
@@ -109,5 +190,5 @@ sub dg-generate-structs is export {
   }
   return %toret;
 }
-  
+
 }
