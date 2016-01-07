@@ -43,15 +43,20 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
   }
   dg-init($att);
   if $enums or $all or $define-enum {
+    say '## Enumerations';
     dg-generate-enums();
   }
   if $functions or $all {
+    say '## Extras stuff';
+    dg-generate-extra();
+    say '## Functions';
     my %h = dg-generate-functions();
     for %h.values -> $v {
        say $v;
     }
   }
   if $structs or $all {
+    say '## Structures';
     my %h = dg-generate-structs();
     for %h.values -> $v {
        say $v;

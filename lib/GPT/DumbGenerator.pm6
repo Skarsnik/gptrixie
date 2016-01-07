@@ -24,6 +24,9 @@ my %ctype-to-p6 = (
 
 sub	resolve-type($t) is export {
   if $t ~~ PointerType {
+    if $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
+      return $t.ref-type.name ~ 'Ptr';
+    }
     return 'Str' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'char' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
     return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
@@ -56,6 +59,14 @@ sub	resolve-type($t) is export {
     return $allthings.unions{$t.id}.gen-name;
   }
   return 'NYI(' ~ $t.Str ~ ')';
+}
+
+sub dg-generate-extra is export {
+    for $allthings.types.kv -> $k, $t {
+      if $t ~~ PointerType and $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
+        say 'constant ' ~ $t.ref-type.name ~ 'Ptr' ~ ' = Pointer;';
+      }
+    }
 }
 
 sub dg-generate-functions is export {
