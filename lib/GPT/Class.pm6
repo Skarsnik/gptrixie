@@ -105,12 +105,14 @@ class CEnum does CLocation is rw is export {
 class FunctionArgument does CLocation is rw is export {
   has		$.name;
   has Type 	$.type;
+  has		$.type-id;
 }
 
 class Function does CLocation is rw is export {
   has	$.id;
   has	$.name;
   has	Type $.returns;
+  has	$.returns-id;
   has	FunctionArgument @.arguments;
 }
 

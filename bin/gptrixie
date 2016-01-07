@@ -67,7 +67,7 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
 sub do-magic($header, @other) {
   my %types;
   my %fields;
-  my %struct;
+  my %structs;
   my @cfunctions;
   my @cenums;
   my %cunions;
@@ -85,117 +85,112 @@ sub do-magic($header, @other) {
   %times<parse-xml> = now - $t;
   $t = now;
   note "Doing magic";
-  my @xmlFiles = $xml.lookfor(:TAG<File>);
-  my @xmlfields = $xml.lookfor(:TAG<Field>);
-  my @xmlFundtypes = $xml.lookfor(:TAG<FundamentalType>);
-  my @xmlPointertypes = $xml.lookfor(:TAG<PointerType>);
-  my @xmlQualtypes = $xml.lookfor(:TAG<CvQualifiedType>);
-  my @xmlTypesdef = $xml.lookfor(:TAG<Typedef>);
-  my @xmlFunctionTypes = $xml.lookfor(:TAG<FunctionType>);
-  my @xmlArrayTypes = $xml.lookfor(:TAG<ArrayType>);
-  my @xmlUnion = $xml.lookfor(:TAG<Union>);
-  my @xmlFunctions = $xml.lookfor(:TAG<Function>, :name(* !~~ /^__/));
-
-  for @xmlFiles -> $ft {
-    %files{$ft.attribs<id>} = $ft.attribs<name>;
-  }
-
-
-  #Gather type
-  for @xmlFundtypes -> $ft {
-    my FundamentalType $t .= new(:id($ft.attribs<id>));
-    $t.name = $ft.attribs<name>;
-    %types{$t.id} = $t;
-  }
-
-  for @xmlFunctionTypes -> $ft {
-    my FunctionType $t .= new(:id($ft.attribs<id>));
-    %types{$t.id} = $t;
-  }
-
-  for @xmlPointertypes -> $ft {
-    my PointerType $t .= new(:id($ft.attribs<id>));
-    $t.ref-id = $ft.attribs<type>;
-    %types{$t.id} = $t;
-  }
-
-  for @xmlQualtypes -> $ft {
-    my QualifiedType $t .= new(:id($ft.attribs<id>));
-    $t.ref-id = $ft.attribs<type>;
-    %types{$t.id} = $t;
-  }
-
-  for @xmlTypesdef -> $ft {
-    my TypeDefType $t .= new(:id($ft.attribs<id>));
-    $t.ref-id = $ft.attribs<type>;
-    $t.name = $ft.attribs<name>;
-    %types{$t.id} = $t;
-  }
-  for @xmlArrayTypes -> $ft {
-    my $size = $ft.attribs<max>.subst('u', '') eq "0xffffffffffffffff" ?? '' !! $ft.attribs<max>.subst('u', '') + 1;   
-    my ArrayType $t .= new(:id($ft.attribs<id>), :size($size));
-    $t.ref-id = $ft.attribs<type>;
-    %types{$t.id} = $t;
-  }
-
-  #Gather 'real' stuff
   
-  for @xmlfields -> $field {
-    my $pf = Field.new();
-    $pf.set-clocation($field);
-    $pf.file = %files{$pf.file-id};
-    $pf.name = $field.attribs<name>;
-    $pf.type-id = $field.attribs<type>;
-    %fields{$field.attribs<id>} = $pf;
-  }
   
-  my @xmlStruct = $xml.lookfor(:TAG<Struct>);
-
-  for @xmlStruct -> $xmls {
-    my $s = Struct.new;
-    $s.name = $xmls.attribs<name>;
-    $s.id = $xmls.attribs<id>;
-    $s.set-clocation($xmls);
-    $s.file = %files{$s.file-id};
-    if $xmls.attribs<members>.defined {
-      my @rawmember = $xmls.attribs<members>.split(' ');
-      for @rawmember {
-        $s.fields.push(%fields{$_}) if %fields{$_}.defined;
+  for $xml.elements() -> $elem {
+    given $elem.name {
+      when 'File' {
+        %files{$elem<id>} = $elem<name>;
+      }
+      # == Types
+      when 'FundamentalType' {
+        my FundamentalType $t .= new(:id($elem<id>));
+        $t.name = $elem<name>;
+        %types{$t.id} = $t;
+      }
+      when 'FunctionType' {
+         my FunctionType $t .= new(:id($elem<id>));
+         %types{$t.id} = $t;
+      }
+      when 'PointerType' {
+        my PointerType $t .= new(:id($elem<id>));
+        $t.ref-id = $elem<type>;
+        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists ;
+        %types{$t.id} = $t;
+      }
+      when 'CvQualifiedType' {
+        my QualifiedType $t .= new(:id($elem<id>));
+        $t.ref-id = $elem<type>;
+        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists ;
+        %types{$t.id} = $t;
+      }
+      when 'Typedef' {
+        my TypeDefType $t .= new(:id($elem<id>));
+        $t.ref-id = $elem<type>;
+        say $elem<name>;
+        say $t.ref-id;
+        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
+        $t.name = $elem<name>;
+        %types{$t.id} = $t;
+      }
+      when 'ArrayType' {
+        my $size = $elem<max>.subst('u', '') eq "0xffffffffffffffff" ?? '' !! $elem<max>.subst('u', '') + 1;   
+        my ArrayType $t .= new(:id($elem<id>), :size($size));
+        $t.ref-id = $elem<type>;
+        %types{$t.id} = $t;
+      }
+      # == 'Real' Stuff
+      when 'Field' {
+        my $pf = Field.new();
+        $pf.set-clocation($elem);
+        $pf.file = %files{$pf.file-id};
+        $pf.name = $elem<name>;
+        $pf.type-id = $elem<type>;
+        %fields{$elem<id>} = $pf;
+        %structs{$elem<context>}.fields.push($pf) if %structs{$elem<context>}.defined;
+        %cunions{$elem<context>}.members.push($pf) if %cunions{$elem<context>}.defined;
+      }
+      when 'Struct' {
+        my $s = Struct.new;
+        $s.name = $elem<name>;
+        $s.id = $elem<id>;
+        $s.set-clocation($elem);
+        $s.file = %files{$s.file-id};
+        %structs{$s.id} = $s;
+        my StructType $t .= new(:id($s.id), :name($s.name));
+        %types{$t.id} = $t;
+      }
+      when 'Union' {
+        my UnionType $t .= new(:id($elem<id>));
+        %types{$t.id} = $t;
+        my CUnion $u .= new(:id($elem<id>)); 
+        $u.struct = %structs{$elem<context>};
+        %cunions{$u.id} = $u;
+      }
+      when 'Enumeration' {
+        my CEnum $enum .= new(:id($elem<id>), :name($elem<name>));
+        my EnumType $t .= new(:id($elem<id>), :name($elem<name>));
+        %types{$t.id} = $t;
+        $enum.set-clocation($elem);
+        $enum.file = %files{$enum.file-id};
+        for @($elem.elements()) -> $enumv {
+          my EnumValue $nv .= new(:name($enumv.attribs<name>), :init($enumv.attribs<init>));
+          $enum.values.push($nv);
+        }
+        @cenums.push($enum);
+      }
+      when 'Function' {
+        next if $elem<name> ~~ /^__/;
+        say $elem<name>;
+        my Function $f .= new(:name($elem<name>), :id($elem<id>));
+        $f.returns-id = $elem<returns>;
+        #$f.returns = %types{$elem<returns>};
+        $f.set-clocation($elem);
+        $f.file = %files{$f.file-id};
+        for @($elem.elements()) -> $param {
+          next if $param.name ne 'Argument';
+          my FunctionArgument $a .= new(:name($param.attribs<name>));
+          $a.set-clocation($param);
+          $a.file = %files{$a.file-id};
+          $a.type-id = $param<type>;
+          #$a.type = %types{$param.attribs<type>};
+          $f.arguments.push($a);
+        }
+        @cfunctions.push($f)
       }
     }
-    %struct{$s.id} = $s;
-    my StructType $t .= new(:id($s.id), :name($s.name));
-    %types{$t.id} = $t;
   }
-
-  for @xmlUnion -> $ft {
-    my UnionType $t .= new(:id($ft.attribs<id>));
-    %types{$t.id} = $t;
-    my CUnion $u .= new(:id($ft.attribs<id>));
-    my @rm = $ft.attribs<members>.split(' ');
-    for @rm -> $rm {
-      $u.members.push(%fields{$rm}) if %fields{$rm}:exists;
-    }
-    $u.struct = %struct{$ft.attribs<context>};
-    %cunions{$u.id} = $u;
-    
-  }
-
-  my @xmlenum = $xml.lookfor(:TAG<Enumeration>);
-
-
-  for @xmlenum -> $m {
-    my CEnum $enum .= new(:id($m.attribs<id>), :name($m.attribs<name>));
-    my EnumType $t .= new(:id($m.attribs<id>), :name($m.attribs<name>));
-    %types{$t.id} = $t;
-    $enum.set-clocation($m);
-    $enum.file = %files{$enum.file-id};
-    for @($m.elements()) -> $enumv {
-      my EnumValue $nv .= new(:name($enumv.attribs<name>), :init($enumv.attribs<init>));
-      $enum.values.push($nv);
-    }
-    @cenums.push($enum);
-  }
+  
 
   #We probably can resolve every type now.
   sub resolvetype {
@@ -215,27 +210,12 @@ sub do-magic($header, @other) {
   }
   resolvetype();
 
-  for @xmlFunctions -> $func {
-    my Function $f .= new(:name($func.attribs<name>), :id($func.attribs<id>));
-    $f.returns = %types{$func.attribs<returns>};
-    $f.set-clocation($func);
-    $f.file = %files{$f.file-id};
-    for @($func.elements()) -> $param {
-      next if $param.name ne 'Argument';
-      my FunctionArgument $a .= new(:name($param.attribs<name>));
-      $a.set-clocation($param);
-      $a.file = %files{$a.file-id};
-      $a.type = %types{$param.attribs<type>};
-      $f.arguments.push($a);
+  for @cfunctions -> $f {
+    $f.returns = %types{$f.returns-id};
+    for $f.arguments -> $a {
+      $a.type = %types{$a.type-id};
     }
-    @cfunctions.push($f);
   }
-
-  # say "List type";
-  # for %types.kv -> $k, $v {
-  #   say $v.id ~ ':' ~ $v.Str;
-  # }
-
   for %fields.kv ->  $id, $f {
     $f.type = %types{$f.type-id};
     if $f.type ~~ UnionType {
@@ -253,7 +233,7 @@ sub do-magic($header, @other) {
    $att.types = %types;
    $att.functions = @cfunctions;
    $att.enums = @cenums;
-   $att.structs = %struct;
+   $att.structs = %structs;
    $att.unions = %cunions;
    return $att;
 }
