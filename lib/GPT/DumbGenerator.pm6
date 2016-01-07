@@ -59,20 +59,19 @@ sub	resolve-type($t) is export {
     return 'Str' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'char' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
 
-    # Can't get this working, use Buf for now
-    #return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
-    #  $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
-    return 'Buf' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
+    # For now: Pointer (and maybe nativecast it later)
+    return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
 
-    # Do something similar for unsigned char*
+    # return 'Buf' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
+    #  $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
+
+    # Use Buf for unsigned char *
     return 'Buf' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'unsigned char' ||
       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'unsigned char';
 
-
     return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
     return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
-
   }
   if $t ~~ ArrayType {
     return 'CArray[' ~ resolve-type($t.ref-type) ~ ']';
