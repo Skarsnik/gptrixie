@@ -78,7 +78,7 @@ sub dg-generate-functions is export {
     }
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
-    my $p6gen = "sub {$f.name} is native(LIB) $returns (" ~ @tmp.join(', ') ~ ') is export { * }';
+    my $p6gen = "sub {$f.name}(" ~  @tmp.join(', ') ~ ") is native(LIB) $returns is export \{ * \}";
     %toret{$f.name} = $p6gen;
   }
   return %toret;

@@ -122,8 +122,8 @@ sub do-magic($header, @other) {
       when 'Typedef' {
         my TypeDefType $t .= new(:id($elem<id>));
         $t.ref-id = $elem<type>;
-        say $elem<name>;
-        say $t.ref-id;
+#         say $elem<name>;
+#         say $t.ref-id;
         $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
         $t.name = $elem<name>;
         %types{$t.id} = $t;
@@ -176,7 +176,6 @@ sub do-magic($header, @other) {
       }
       when 'Function' {
         next if $elem<name> ~~ /^__/;
-        say $elem<name>;
         my Function $f .= new(:name($elem<name>), :id($elem<id>));
         $f.returns-id = $elem<returns>;
         #$f.returns = %types{$elem<returns>};
