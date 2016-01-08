@@ -28,7 +28,7 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
       if $v.IO.basename ne 'gccxml_builtins.h' and $v.IO.basename !~~ /^std/ {
         my $fh = open $v;
         for $fh.lines -> $line {
-          if $line ~~ /^"#"\s*"define" \s+ ($enum-pattern.+) \s+ (.+)/ {
+          if $line ~~ /^"#"\s*"define" \s+ ($enum-pattern\S*) \s+ (<-[\/]>+)/ {
             my EnumValue $ev .= new;
             $ev.name = $0;
             $ev.init = $1;
