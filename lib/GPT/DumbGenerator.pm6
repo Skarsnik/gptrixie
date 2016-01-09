@@ -86,7 +86,7 @@ sub dg-generate-functions is export {
 
 sub dg-generate-enums() is export {
   for $allthings.enums -> $e {
-    say 'enum ' ~ $e.name ~ ' is export = (';
+    say 'enum ' ~ $e.name ~ ' is export (';
     my @tmp;
     for @($e.values) -> $v {
       @tmp.push("   " ~ $v.name ~ " => " ~ $v.init);
