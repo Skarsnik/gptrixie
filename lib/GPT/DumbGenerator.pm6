@@ -64,7 +64,10 @@ sub	resolve-type($t) is export {
 sub dg-generate-extra is export {
     for $allthings.types.kv -> $k, $t {
       if $t ~~ PointerType and $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
-        say 'constant ' ~ $t.ref-type.name ~ 'Ptr' ~ ' = Pointer;';
+        say 'constant ' ~ $t.ref-type.name ~ 'Ptr is export = Pointer;';
+      }
+      if $t ~~ TypeDefType and $t.ref-type ~~ StructType {
+        say 'constant ' ~ $t.name ~ ' is export := ' ~ $t.ref-type.name ~ ';';
       }
     }
 }
