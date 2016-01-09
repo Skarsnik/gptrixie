@@ -107,7 +107,8 @@ sub dg-generate-structs is export {
       #$p6gen ~= "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ "; # " ~ $m.type ~ ' ' ~ $m.name ~ "\n";
     }
     $p6gen ~= "}";
-    %toret{$cu.gen-name} = $p6gen;
+    %toret{$cu.gen-name}<p6str> = $p6gen;
+    %toret{$cu.gen-name}<obj> = $cu;
   }
   for $allthings.structs.kv -> $k, $s {
     $p6gen = "class {$s.name} is repr('CStruct') is export \{\n";
@@ -116,9 +117,17 @@ sub dg-generate-structs is export {
       $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($field.type), $field.name, $field.type, $field.name);
     }
     $p6gen ~= "}";
-    %toret{$s.name} = $p6gen;
+    %toret{$s.name}<p6str> = $p6gen;
+    %toret{$s.name}<obj> = $s;
   }
   return %toret;
 }
+
+sub	dg-generate-externs is export {
+  for $allthings.variables -> $v {
+    say 'our '~ resolve-type($v.type) ~ ' $' ~ $v.name ~ ' is export = cglobals(LIB, "' ~ $v.name ~ '", ' ~ resolve-type($v.type) ~ ');'
+  }
   
+}
+
 }

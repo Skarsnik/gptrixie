@@ -124,6 +124,13 @@ class CUnion does CLocation is rw is export {
   has   $.gen-name;
 }
 
+class ExternVariable does CLocation is rw is export {
+  has	$.id;
+  has	$.name;
+  has	$.type-id;
+  has	$.type;
+}
+
 class AllTheThings is rw is export {
   has	@.functions;
   has	%.types;
@@ -131,6 +138,7 @@ class AllTheThings is rw is export {
   has	%.structs;
   has	%.files;
   has	%.unions;
+  has	@.variables;
 }
 
 }

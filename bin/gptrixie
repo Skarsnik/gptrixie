@@ -8,7 +8,8 @@ use GPT::DumbGenerator;
 
 
 
-sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, Bool :$functions, Bool :$structs, *@other) {
+sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
+         Bool :$functions, Bool :$structs, Bool :$externs, *@other) {
 
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
@@ -46,6 +47,23 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
     say '## Enumerations';
     dg-generate-enums();
   }
+  if $structs or $all {
+    say '## Structures';
+    my %h = dg-generate-structs();
+    my @sorted = %h.values.sort({$^a<obj>.start-line > $^b<obj>.start-line});
+    #say @sorted;
+    for @sorted.kv -> $i, $v {
+       if $v<obj> ~~ Struct {
+         if @sorted[$i + 1].defined and @sorted[$i + 1]<obj> ~~ CUnion and @sorted[$i + 1]<obj>.struct.defined {
+           say @sorted[$i + 1]<p6str>;
+         }
+       }
+       if !($v<obj> ~~ CUnion and $v<obj>.struct.defined) {
+         say $v<p6str>;
+       }
+    }
+  }
+  
   if $functions or $all {
     say '## Extras stuff';
     dg-generate-extra();
@@ -55,12 +73,10 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums, B
        say $v;
     }
   }
-  if $structs or $all {
-    say '## Structures';
-    my %h = dg-generate-structs();
-    for %h.values -> $v {
-       say $v;
-    }
+  
+  if $externs or $all {
+    say '## Externs';
+    dg-generate-externs();
   }
 }
 
@@ -77,6 +93,7 @@ sub do-magic($header, @other) {
   my @cenums;
   my %cunions;
   my %files;
+  my @variables;
   
   my %times;
 
@@ -158,8 +175,9 @@ sub do-magic($header, @other) {
       when 'Union' {
         my UnionType $t .= new(:id($elem<id>));
         %types{$t.id} = $t;
-        my CUnion $u .= new(:id($elem<id>)); 
-        $u.struct = %structs{$elem<context>};
+        my CUnion $u .= new(:id($elem<id>));
+        $u.set-clocation($elem);
+        $u.struct = %structs{$elem<context>} with $elem<context>;
         %cunions{$u.id} = $u;
       }
       when 'Enumeration' {
@@ -178,7 +196,6 @@ sub do-magic($header, @other) {
         next if $elem<name> ~~ /^__/;
         my Function $f .= new(:name($elem<name>), :id($elem<id>));
         $f.returns-id = $elem<returns>;
-        #$f.returns = %types{$elem<returns>};
         $f.set-clocation($elem);
         $f.file = %files{$f.file-id};
         for @($elem.elements()) -> $param {
@@ -187,10 +204,18 @@ sub do-magic($header, @other) {
           $a.set-clocation($param);
           $a.file = %files{$a.file-id};
           $a.type-id = $param<type>;
-          #$a.type = %types{$param.attribs<type>};
           $f.arguments.push($a);
         }
         @cfunctions.push($f)
+      }
+      when 'Variable' {
+        if $elem<extern> == 1 {
+          my ExternVariable $e .= new(:id($elem<id>), :name($elem<name>));
+          $e.type-id = $elem<type>;
+          $e.set-clocation($elem);
+          #$e.file = %files($e.file-id);
+          @variables.push($e);
+        }
       }
     }
   }
@@ -229,6 +254,10 @@ sub do-magic($header, @other) {
   for %cunions.kv -> $k, $cu {
     $cu.gen-name = $cu.struct.name ~ "_" ~ $cu.field.name ~ "_Union";
   }
+  for @variables -> $v {
+    $v.type = %types{$v.type-id};
+    #say $v.name ~ ' - ' ~ $v.type;
+  }
   
   %times<magic> = now - $t;
   note "Times -- gccxml: %times<gccxml> sec; xml parsing: %times<parse-xml> sec; magic: %times<magic>";
@@ -239,6 +268,7 @@ sub do-magic($header, @other) {
    $att.enums = @cenums;
    $att.structs = %structs;
    $att.unions = %cunions;
+   $att.variables = @variables;
    return $att;
 }
 
