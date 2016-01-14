@@ -9,15 +9,45 @@ sub dg-init($allt) is export {
 }
 
 my %ctype-to-p6 = (
-  'char' => 'int8',
-  'bool' => 'bool',
-  '_bool' => 'bool',
-  'int' => 'int32',
-  'float' => 'num32',
-  'double' => 'num64',
-  'long' => 'long',
-  'unsigned int' => 'uint32',
-  'unsigned char' => 'uint8'
+'bool'            => 'bool',
+  '_bool'           => 'bool',
+
+  'char'            => 'int8',
+  'unsigned char'   => 'uint8',
+
+  'short'           => 'int16',
+  'unsigned short'  => 'uint16',
+
+  'int'             => 'int32',
+  'unsigned int'    => 'uint32',
+
+  'float'           => 'num32',
+  'double'          => 'num64',
+
+  'long'            => 'long',
+  'long int'        => 'long',
+  'unsigned long'   => 'ulong',
+  'unsigned long int' => 'ulong',
+
+  'long long'       => 'longlong',
+  'long long int'   => 'longlong',
+
+  'unsigned long long'      => 'ulonglong',
+  'unsigned long long int'  => 'ulonglong',
+  'long long unsigned int'  => 'ulonglong'
+).hash;
+
+my %stdinttype-to-p6 = (
+  # Fixed width types from stdint.h
+  'int8_t'          => 'int8',
+  'int16_t'         => 'int16',
+  'int32_t'         => 'int32',
+  'int64_t'         => 'int64',
+
+  'uint8_t'         => 'uint8',
+  'uint16_t'        => 'uint16',
+  'uint32_t'        => 'uint32',
+  'uint64_t'        => 'uint64',
 ).hash;
 
 
@@ -53,6 +83,7 @@ sub	resolve-type($t) is export {
   if $t ~~ TypeDefType {
     return 'size_t' if $t.name eq 'size_t';
     return $t.name if $t.ref-type ~~ FundamentalType;
+    return %stdinttype-to-p6{$t.name} if %stdinttype-to-p6{$t.name};
     return resolve-type($t.ref-type);
   }
   if $t ~~ UnionType {
