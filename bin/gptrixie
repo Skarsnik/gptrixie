@@ -3,10 +3,9 @@ use GPT::Class;
 use GPT::DumbGenerator;
 #use OOGenerator;
 
-
-
-
-
+BEGIN {
+  say "BEGIN";
+}
 
 sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
          Bool :$functions, Bool :$structs, Bool :$externs, *@other) {

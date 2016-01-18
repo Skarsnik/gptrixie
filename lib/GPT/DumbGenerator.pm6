@@ -57,10 +57,10 @@ sub	resolve-type($t) is export {
     if $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
       return $t.ref-type.name ~ 'Ptr';
     }
-    return 'Str' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'char' ||
-      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
-    return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
-      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
+    return 'Str' if $t type-eq <Ptr char>;# | <Ptr const char>;
+    return 'Pointer' if $t.ref-type type-eq <void>;# | <const void>;
+#      return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
+#       $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
     return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
     return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
     

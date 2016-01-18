@@ -55,6 +55,12 @@ class UnionType is DirectType is export {
   }
 }
 
+class ReferenceType is IndirectType {
+  method Str {
+    return $.ref-type.Str ~ '&';
+  }
+}
+
 class FunctionType is DirectType is export {
   method Str {
     'PtrFunc';
@@ -64,7 +70,56 @@ class FunctionType is DirectType is export {
 class EnumType is DirectType is export {
 }
 
+multi sub infix:<type-eq>(Type:D $t, Str:D $s) returns Bool is export {
+   $t type-eq $s.list;
+}
 
+multi sub infix:<type-eq>(Type:D $t, List:D $l) returns Bool is export {
+  my $type = $t;
+  say $l;
+  for @($l) -> $s {
+    given $s {
+      when 'ptr' | 'Ptr' {
+        return False if $type !~~ PointerType;
+      }
+      when 'Ref' | 'ref' {
+        return False if $type !~~ ReferenceType;
+      }
+      when 'fund' | 'Fund' {
+        return False if $type !~~ FundamentalType;
+      }
+      when 'typedef' | /^'typedef['(.+)']'/ {
+        return False if $type !~~ TypeDefType;
+        return False if $0 and $0 ne $type.name;
+      }
+      when 'struct' | /^"struct["(.+)']'/ {
+        return False if $type !~~ StructType;
+        return False if $0 and $0 ne $type.name;
+      }
+      when 'Union' | 'union' {
+        return False if $type !~~ UnionType;
+      }
+      when 'const' | 'qualif' {
+        return False if $type !~~ QualifiedType;
+      }
+      when 'enum' | 'Enum' {
+        return False if $type !~~ EnumType;
+      }
+      when 'FunPtr' | 'funptr' {
+        return False if $type !~~ FunctionType;
+      }
+      default {
+        say "Testing $s -- " ~ $type;
+        return False if $type !~~ FundamentalType;
+        return False if $type.name ne $s;
+        return True if $type.name eq $s;
+      }
+    }
+    $type = $type.ref-type if $type ~~ IndirectType;
+  }
+  say "Meh==";
+  return True;
+}
 # Real class
 
 # to keep track of the location

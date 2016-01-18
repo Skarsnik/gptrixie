@@ -25,3 +25,5 @@ void	pretty_print(const char *toprint);
 void	*do_stuff(s1 s, 
 	  size_t piko,
 	  bool b);
+
+void	takeintptr(int *hello);
