@@ -6,7 +6,7 @@ role Type is export {
 }
 
 class DirectType does Type is export {
-  has	$.name is rw;
+  has	Str $.name is rw = "";
   method Str {
     $!name;
   }
@@ -58,6 +58,12 @@ class UnionType is DirectType is export {
 class FunctionType is DirectType is export {
   method Str {
     'PtrFunc';
+  }
+}
+
+class ReferenceType is IndirectType is export {
+  method Str {
+    return $.ref-type.Str ~ '&';
   }
 }
 
@@ -118,10 +124,14 @@ class Function does CLocation is rw is export {
 
 class CUnion does CLocation is rw is export {
   has	$.id;
+  has   @.members;
+  has	$.name;
+}
+
+class AnonymousUnion is CUnion is rw is export {
+  has   $.gen-name;
   has   $.field;
   has   $.struct;
-  has   @.members;
-  has   $.gen-name;
 }
 
 class ExternVariable does CLocation is rw is export {

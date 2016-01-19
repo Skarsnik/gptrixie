@@ -3,6 +3,11 @@ use GPT::Class;
 module GPT::DumbGenerator {
 
 my AllTheThings	$allthings;
+my	$debug = False;
+
+sub	debug(*@stuff) {
+  say(|@stuff) if $debug;
+}
 
 sub dg-init($allt) is export {
   $allthings = $allt;
@@ -13,10 +18,13 @@ my %ctype-to-p6 = (
   '_bool'           => 'bool',
 
   'char'            => 'int8',
+  'signed char'     => 'int8',
   'unsigned char'   => 'uint8',
 
   'short'           => 'int16',
+  'short int'       => 'int16',
   'unsigned short'  => 'uint16',
+  'short unsigned int' => 'uint16',
 
   'int'             => 'int32',
   'unsigned int'    => 'uint32',
@@ -28,6 +36,7 @@ my %ctype-to-p6 = (
   'long int'        => 'long',
   'unsigned long'   => 'ulong',
   'unsigned long int' => 'ulong',
+  'long unsigned int' => 'ulong',
 
   'long long'       => 'longlong',
   'long long int'   => 'longlong',
@@ -52,24 +61,30 @@ my %stdinttype-to-p6 = (
 
 
 
-sub	resolve-type($t) is export {
+sub	resolve-type($t, $cpt = 0) is export {
+  debug "==" x $cpt ~ $t.id ~ $t.WHAT.perl ~ ' ' ~ $t;
   if $t ~~ PointerType {
     if $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
       return $t.ref-type.name ~ 'Ptr';
     }
-    return 'Str' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'char' ||
-      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'char';
-    return 'Pointer' if $t.ref-type ~~ FundamentalType && $t.ref-type.name eq 'void' ||
-      $t.ref-type ~~ QualifiedType && $t.ref-type.ref-type.name eq 'void';
+    return 'Str' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'char') ||
+      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type.name eq 'char');
+    return 'Pointer' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'void') ||
+      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type.name eq 'void');
     return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
-    return 'Pointer[' ~ resolve-type($t.ref-type) ~ ']';
+    return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1) ~ ']';
     
   }
   if $t ~~ ArrayType {
-    return 'CArray[' ~ resolve-type($t.ref-type) ~ ']';
+    return 'CArray[' ~ resolve-type($t.ref-type, $cpt + 1) ~ ']';
   }
   if $t ~~ FundamentalType {
-    return %ctype-to-p6{$t.name};
+    if %ctype-to-p6{$t.name}:exists {
+      return %ctype-to-p6{$t.name};
+    } else {
+      warn "Encounter a not know FundamentalType ({$t.name}), either it missing in DG dic or you need to do something specific";
+      return "NAT{$t.name}NAT";
+    }
   }
   if $t ~~ EnumType {
     return 'int32';
@@ -78,16 +93,17 @@ sub	resolve-type($t) is export {
     return $t.name;
   }
   if $t ~~ QualifiedType {
-    return resolve-type($t.ref-type);
+    return resolve-type($t.ref-type, $cpt + 1);
   }
   if $t ~~ TypeDefType {
     return 'size_t' if $t.name eq 'size_t';
     return $t.name if $t.ref-type ~~ FundamentalType;
     return %stdinttype-to-p6{$t.name} if %stdinttype-to-p6{$t.name};
-    return resolve-type($t.ref-type);
+    return resolve-type($t.ref-type, $cpt + 1);
   }
   if $t ~~ UnionType {
-    return $allthings.unions{$t.id}.gen-name;
+    return $allthings.unions{$t.id} ~~ AnonymousUnion ?? $allthings.unions{$t.id}.gen-name 
+           !! $allthings.unions{$t.id}.name;
   }
   return 'NYI(' ~ $t.Str ~ ')';
 }
@@ -107,6 +123,7 @@ sub dg-generate-functions is export {
   my %toret;
   for $allthings.functions -> $f {
     my @tmp = ();
+    debug "Function:" ~ $f.name;
     for $f.arguments -> $a {
       @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? '$' ~ $a.name !! ''));
     }
@@ -134,19 +151,22 @@ sub dg-generate-structs is export {
   my %toret;
   my $p6gen;
   for $allthings.unions.kv -> $k, $cu {
-    $p6gen = "class {$cu.gen-name} is repr('CUnion') is export \{\n";
+    my $u-name = $cu ~~ AnonymousUnion ?? $cu.gen-name !! $cu.name;
+    $p6gen = "class $u-name is repr('CUnion') is export \{\n";
     for $cu.members -> $m {
       my $has = ($m.type ~~ StructType) ?? 'HAS' !! 'has';
       $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($m.type), $m.name, $m.type, $m.name);
       #$p6gen ~= "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ "; # " ~ $m.type ~ ' ' ~ $m.name ~ "\n";
     }
     $p6gen ~= "}";
-    %toret{$cu.gen-name}<p6str> = $p6gen;
-    %toret{$cu.gen-name}<obj> = $cu;
+    %toret{$u-name}<p6str> = $p6gen;
+    %toret{$u-name}<obj> = $cu;
   }
   for $allthings.structs.kv -> $k, $s {
+    debug "Structure : " ~ $s.name;
     $p6gen = "class {$s.name} is repr('CStruct') is export \{\n";
     for $s.fields -> $field {
+      debug "--Field : " ~ $field.name ~ "    " ~ $field.type;
       my $has = ($field.type ~~ StructType | UnionType) ?? 'HAS' !! 'has';
       $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($field.type), $field.name, $field.type, $field.name);
     }

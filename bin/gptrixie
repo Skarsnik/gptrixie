@@ -9,15 +9,54 @@ use GPT::DumbGenerator;
 
 
 sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
-         Bool :$functions, Bool :$structs, Bool :$externs, *@other) {
+         Bool :$functions, Bool :$structs, Bool :$externs,
+         Bool :$list-types, *@other) {
 
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
   my AllTheThings $att = do-magic($header-file, @other);
+  note 'Number of things founds';
+  note '-Types: ' ~ $att.types.elems;
+  note '-Structures: ' ~ $att.structs.elems;
+  note '-Unions: ' ~ $att.unions.elems;
+  note '-Enums: ' ~ $att.enums.elems;
+  note '-Functions: ' ~ $att.functions.elems;
+  note '-Variables: ' ~ $att.variables.elems;
+  note '-Files: ' ~ $att.files.elems;
   note "Time to generate stuff\n\n";
   
-  
+  if $list-types {
+    my %tdisplay;
+    
+    my %t = $att.types;
+    for %t.kv -> $k, $v {
+      for <FundamentalType StructType UnionType ArrayType TypeDefType> -> $cmp {
+        if $v ~~ ::($cmp) {
+          %tdisplay{$cmp}.push($v);
+          %t{$k}:delete;
+        }
+      }
+    }
+    for <FundamentalType StructType UnionType ArrayType TypeDefType> -> $cmp {
+      next unless %tdisplay{$cmp}:exists;
+      say "====$cmp (" ~ @(%tdisplay{$cmp}).elems ~ ") ====";
+      for @(%tdisplay{$cmp}) -> $t {
+        say $t.id~ ':' ~$t;
+      }
+    }
+    say "====OTHER====";
+    for %t.values {
+      say ~$_;
+    }
+    for $att.types.values {
+      if $_ ~~ IndirectType {
+        if $_.ref-type !~~ Type {
+          say "Type Error: " ~ $_.id ~ " did not get resolved";
+        }
+      }
+    }
+  }
   #if $ooc {
   #  oog-config($ooc);
   #  oog-generate();
@@ -54,11 +93,11 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
     #say @sorted;
     for @sorted.kv -> $i, $v {
        if $v<obj> ~~ Struct {
-         if @sorted[$i + 1].defined and @sorted[$i + 1]<obj> ~~ CUnion and @sorted[$i + 1]<obj>.struct.defined {
+         if @sorted[$i + 1].defined and @sorted[$i + 1]<obj> ~~ AnonymousUnion and @sorted[$i + 1]<obj>.struct.defined {
            say @sorted[$i + 1]<p6str>;
          }
        }
-       if !($v<obj> ~~ CUnion and $v<obj>.struct.defined) {
+       if !($v<obj> ~~ AnonymousUnion and $v<obj>.struct.defined) {
          say $v<p6str>;
        }
     }
@@ -127,13 +166,13 @@ sub do-magic($header, @other) {
       when 'PointerType' {
         my PointerType $t .= new(:id($elem<id>));
         $t.ref-id = $elem<type>;
-        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists ;
+        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
         %types{$t.id} = $t;
       }
       when 'CvQualifiedType' {
         my QualifiedType $t .= new(:id($elem<id>));
         $t.ref-id = $elem<type>;
-        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists ;
+        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
         %types{$t.id} = $t;
       }
       when 'Typedef' {
@@ -151,6 +190,12 @@ sub do-magic($header, @other) {
         $t.ref-id = $elem<type>;
         %types{$t.id} = $t;
       }
+      when 'ReferenceType' {
+        my ReferenceType $t .= new(:id($elem<id>));
+        $t.ref-id = $elem<type>;
+        $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
+        %types{$t.id} = $t;
+      }
       # == 'Real' Stuff
       when 'Field' {
         my $pf = Field.new();
@@ -164,7 +209,7 @@ sub do-magic($header, @other) {
       }
       when 'Struct' {
         my $s = Struct.new;
-        $s.name = $elem<name>;
+        $s.name = $elem<name>.defined ?? $elem<name> !! $elem<mangled>; #FIXME
         $s.id = $elem<id>;
         $s.set-clocation($elem);
         $s.file = %files{$s.file-id};
@@ -175,9 +220,15 @@ sub do-magic($header, @other) {
       when 'Union' {
         my UnionType $t .= new(:id($elem<id>));
         %types{$t.id} = $t;
-        my CUnion $u .= new(:id($elem<id>));
+        my $u;
+        with $elem<name> {
+          $u = CUnion.new(:id($elem<id>));
+          $u.name = $elem<name>;
+        } else {
+          $u = AnonymousUnion.new(:id($elem<id>));
+          $u.struct = %structs{$elem<context>};
+        }      
         $u.set-clocation($elem);
-        $u.struct = %structs{$elem<context>} with $elem<context>;
         %cunions{$u.id} = $u;
       }
       when 'Enumeration' {
@@ -252,7 +303,9 @@ sub do-magic($header, @other) {
     }
   }
   for %cunions.kv -> $k, $cu {
-    $cu.gen-name = $cu.struct.name ~ "_" ~ $cu.field.name ~ "_Union";
+    if $cu ~~ AnonymousUnion {
+      $cu.gen-name = $cu.struct.name ~ "_" ~ $cu.field.name ~ "_Union";
+    }
   }
   for @variables -> $v {
     $v.type = %types{$v.type-id};
