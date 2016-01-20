@@ -9,8 +9,10 @@ or make sure the gccxml executable is gccxml
 # Usage
 
 `Usage:
-gptrixie [--all] [--define-enum=<Str>] [--ooc=<Str>] [--enums] [--functions] [--structs] [--externs] [--list-types] <header-file> [<other> ...]
+gptrixie [--all] [--define-enum=<Str>] [--ooc=<Str>] [--enums] [--functions] [--structs] [--externs] [--list-types] <header-file> [<gccoptions> ...]
 `
+
+gccoptions can be stuff like -I /another/include/path
 
 The --define-enum option allow you to generate an enum from #define, it take a starting string like `MSQL_TYPE`
 
@@ -40,6 +42,7 @@ The default generator is not smart. It can't really make sense of what the type 
 choice are made for you. You will probably have to adjust the generated code.
 
 char * and const char * became Str
+
 void * and const void * are Pointer
 
 Typedef defined on top of a fundamental C type are left like that. You will have to complete the missing

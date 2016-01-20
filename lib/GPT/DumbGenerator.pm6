@@ -62,13 +62,15 @@ my %stdinttype-to-p6 = (
 
 
 sub	resolve-type($t, $cpt = 0) is export {
-  debug "==" x $cpt ~ $t.id ~ $t.WHAT.perl ~ ' ' ~ $t;
+  debug "==" x $cpt ~ $t.id ~ ' ' ~ $t.WHAT.perl ~ ' ' ~ $t;
   if $t ~~ PointerType {
     if $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
       return $t.ref-type.name ~ 'Ptr';
     }
+    #say "PIKO : " ~ ($t.ref-type ~~ FundamentalType);
     return 'Str' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'char') ||
       ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type.name eq 'char');
+    #say "HELLO";
     return 'Pointer' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'void') ||
       ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type.name eq 'void');
     return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
@@ -124,7 +126,8 @@ sub dg-generate-functions is export {
   for $allthings.functions -> $f {
     my @tmp = ();
     debug "Function:" ~ $f.name;
-    for $f.arguments -> $a {
+    for $f.arguments.kv -> $i, $a {
+      debug "Param $i : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
       @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? '$' ~ $a.name !! ''));
     }
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!

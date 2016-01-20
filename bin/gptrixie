@@ -10,12 +10,15 @@ use GPT::DumbGenerator;
 
 sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
          Bool :$functions, Bool :$structs, Bool :$externs,
-         Bool :$list-types, *@other) {
+         Bool :$list-types,
+         Bool :$list-files,
+         Str :$files,
+         *@gccoptions) {
 
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
-  my AllTheThings $att = do-magic($header-file, @other);
+  my AllTheThings $att = do-magic($header-file, @gccoptions);
   note 'Number of things founds';
   note '-Types: ' ~ $att.types.elems;
   note '-Structures: ' ~ $att.structs.elems;
@@ -55,6 +58,17 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
           say "Type Error: " ~ $_.id ~ " did not get resolved";
         }
       }
+    }
+  }
+  if $list-files {
+    for $att.files.keys.sort:{$^a.substr(1) > $^b.substr(1)} -> $k {
+      sub count-stuff(@t, $file) {
+        return (@t.grep:{$_.file-id eq $file}).elems;
+      }
+      my $func = count-stuff($att.functions, $k);
+      my $enum = count-stuff($att.enums, $k);
+      my $struct = count-stuff($att.structs.values, $k);
+      printf "%-5s%s%-50s - Functions(%d), Enums(%d), Structures(%d)\n", $k, ' : ', $att.files{$k}, $func, $enum, $struct;
     }
   }
   #if $ooc {
