@@ -27,3 +27,5 @@ void	*do_stuff(s1 s,
 	  bool b,
 	  const char** const plo
  		);
+
+int  flood(char &ref);

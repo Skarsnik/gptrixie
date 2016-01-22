@@ -3,7 +3,7 @@ use GPT::Class;
 module GPT::DumbGenerator {
 
 my AllTheThings	$allthings;
-my	$debug = False;
+my	$debug = %*ENV<DG_DEBUG>;
 
 sub	debug(*@stuff) {
   say(|@stuff) if $debug;
@@ -64,15 +64,14 @@ my %stdinttype-to-p6 = (
 sub	resolve-type($t, $cpt = 0) is export {
   debug "==" x $cpt ~ $t.id ~ ' ' ~ $t.WHAT.perl ~ ' ' ~ $t;
   if $t ~~ PointerType {
+    debug "ref-type : " ~ $t.ref-type.id ~ '/'  ~ $t.ref-id ~ ' '~ $t.ref-type.WHAT.perl ~ " - " ~ $t.ref-type;
     if $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
       return $t.ref-type.name ~ 'Ptr';
     }
-    #say "PIKO : " ~ ($t.ref-type ~~ FundamentalType);
     return 'Str' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'char') ||
-      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type.name eq 'char');
-    #say "HELLO";
+      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'char');
     return 'Pointer' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'void') ||
-      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type.name eq 'void');
+      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void');
     return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
     return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1) ~ ']';
     
@@ -125,11 +124,12 @@ sub dg-generate-functions is export {
   my %toret;
   for $allthings.functions -> $f {
     my @tmp = ();
-    debug "Function:" ~ $f.name;
+    debug "Function (" ~ $allthings.files{$f.file-id} ~ ':' ~ $f.start-line ~ "):" ~ $f.name;
     for $f.arguments.kv -> $i, $a {
       debug "Param $i : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
       @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? '$' ~ $a.name !! ''));
     }
+    debug "Returns";
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
     my $p6gen = "sub {$f.name}(" ~  @tmp.join(', ') ~ ") is native(LIB) $returns is export \{ * \}";

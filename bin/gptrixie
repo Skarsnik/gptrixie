@@ -151,7 +151,7 @@ sub do-magic($header, @other) {
   my %times;
 
   my $t = now;
-  note "Calling GCCXML : gccxml $header -fxml=plop.xml";
+  note "Calling GCCXML : gccxml $header -fxml=plop.xml", @other;
   run "gccxml",  $header, "-fxml=plop.xml", @other;
   %times<gccxml> = now - $t;
   $t = now;
