@@ -3,7 +3,7 @@
 A tool to generate NativeCall code from C headers
 
 You will need gccxml and gcc/g++ 4.9
-Beware thatsome distributions provide gccxml as castxml and it's bad (does not want to take c99 headers), you will need to change the code to use gccxml.real
+Beware some distributions provide gccxml as castxml and it's bad (does not want to take c99 headers), you will need to change the code to use gccxml.real
 or make sure the gccxml executable is gccxml
 
 # Usage
