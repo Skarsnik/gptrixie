@@ -3,7 +3,7 @@
 A tool to generate NativeCall code from C headers
 
 You will need gccxml and gcc/g++ 4.9
-Beware some distrib provide gccxml as castxml and it's bad (does not want to take c99 headers), you will need to change the code to use gccxml.real
+Beware thatsome distributions provide gccxml as castxml and it's bad (does not want to take c99 headers), you will need to change the code to use gccxml.real
 or make sure the gccxml executable is gccxml
 
 # Usage
@@ -14,12 +14,12 @@ gptrixie [--all] [--define-enum=<Str>] [--ooc=<Str>] [--enums] [--functions] [--
 
 gccoptions can be stuff like -I /another/include/path
 
-The --define-enum option allow you to generate an enum from #define, it take a starting string like `MSQL_TYPE`
+The --define-enum option allows you to generate an enum from #define, it takes a starting string like `MSQL_TYPE`
 
-The --list-types option is mainly for debugging, it lists all the C types founds
+The --list-types option is mainly for debugging, it lists all the C types found.
 
-You can do a 'dry' run without option to have an idea of the lenght of the output, it can be useful
-to know what to expect. This is an example with one of a libxml2 headers.
+You can do a 'dry' run without options, to have an idea of the lenght of the output. It can be useful
+to know what to expect. This is an example with one of a libxml2 headers:
 
 ```
 Number of things founds
@@ -32,20 +32,20 @@ Number of things founds
 -Files: 52
 ```
 
-Most GPTrixie message are in stderr, allowing you to redirect the generate perl6 code in a file.
+Most GPTrixie messages are in stderr, allowing you to redirect the generated perl6 code into a file.
 
-More options will come and other specific generators too.
+More options and other specific generators will come in the future.
 
 # Limitations
 
-The default generator is not smart. It can't really make sense of what the type is used. some arbitrary
-choice are made for you. You will probably have to adjust the generated code.
+The default generator is not smart. It can't really make sense of how the type is used; some arbitrary
+choice is made for you. You will probably have to adjust the generated code.
 
-char * and const char * became Str
+char * and const char * become Str
 
 void * and const void * are Pointer
 
-Typedef defined on top of a fundamental C type are left like that. You will have to complete the missing
+Typedef defined on top of a fundamental C type are left as is. You will have to complete the missing
 definition for the type. This choice is based on stuff like sqlite_int64 where is up to you to either
 replace with int64 or define a `constant sqlite_int64 = int64`
 
@@ -203,7 +203,7 @@ our GumboSourcePosition $kGumboEmptySourcePosition is export = cglobals(LIB, "kG
 
 ```
 
-# Reporting a bug/errors
+# Reporting bugs and errors
 
 Use the github issue tracker. Try to give the name of the headers
 
