@@ -83,7 +83,7 @@ sub	resolve-type($t, $cpt = 0) is export {
     if %ctype-to-p6{$t.name}:exists {
       return %ctype-to-p6{$t.name};
     } else {
-      warn "Encounter a not know FundamentalType ({$t.name}), either it missing in DG dic or you need to do something specific";
+      warn "Encountered a non know FundamentalType ({$t.name}), either it missing in DG dic or you need to do something specific";
       return "NAT{$t.name}NAT";
     }
   }
@@ -133,21 +133,27 @@ sub dg-generate-functions is export {
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
     my $p6gen = "sub {$f.name}(" ~  @tmp.join(', ') ~ ") is native(LIB) $returns is export \{ * \}";
-    %toret{$f.name} = $p6gen;
+    %toret{$f.name}<p6str> = $p6gen;
+    %toret{$f.name}<obj> = $f;
   }
   return %toret;
 }
 
 sub dg-generate-enums() is export {
+  my %toret;
   for $allthings.enums -> $e {
-    say 'enum ' ~ $e.name ~ ' is export (';
+    my $p6gen = '';
+    $p6gen ~= 'enum ' ~ $e.name ~ ' is export (' ~ "\n";
     my @tmp;
     for @($e.values) -> $v {
       @tmp.push("   " ~ $v.name ~ " => " ~ $v.init);
     }
-    say @tmp.join(",\n");
-    say ");";
+    $p6gen ~= @tmp.join(",\n") ~ "\n";
+    $p6gen ~= ");";
+    %toret{$e.name}<p6str> = $p6gen;
+    %toret{$e.name}<obj> = $e;
   }
+  return %toret;
 }
 
 sub dg-generate-structs is export {
@@ -181,10 +187,12 @@ sub dg-generate-structs is export {
 }
 
 sub	dg-generate-externs is export {
+  my %toret;
   for $allthings.variables -> $v {
-    say 'our '~ resolve-type($v.type) ~ ' $' ~ $v.name ~ ' is export = cglobals(LIB, "' ~ $v.name ~ '", ' ~ resolve-type($v.type) ~ ');'
+    %toret{$v.name}<p6str> =  'our '~ resolve-type($v.type) ~ ' $' ~ $v.name ~ ' is export = cglobals(LIB, "' ~ $v.name ~ '", ' ~ resolve-type($v.type) ~ ');';
+    %toret{$v.name}<obj> = $v;
   }
-  
+  return %toret;
 }
 
 }

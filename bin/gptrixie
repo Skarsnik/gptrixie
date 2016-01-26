@@ -8,16 +8,43 @@ use GPT::DumbGenerator;
 
 
 
-sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
-         Bool :$functions, Bool :$structs, Bool :$externs,
-         Bool :$list-types,
-         Bool :$list-files,
-         Str :$files,
-         *@gccoptions) {
-
+sub MAIN($header-file #= The header file
+         , Bool :$all #= Generate everything
+         , Str :$define-enum #= Try to generate enumeration from #define using the given starting pattern
+         , Str :$ooc #= Do nothing
+         , Bool :$enums #= Generate enumerations
+         , Bool :$functions #= Generate functions
+         , Bool :$structs #= Generate structures and unions
+         , Bool :$externs #= Generate extern declaration
+         , Bool :$list-types #= Mostly for debug purpose, list all the C type found
+         , Bool :$list-files #= List all the files involved
+         , Str :$files #= WIP Allow you to pick from which files you want to generate stuff. eg --files=myheader.h,mysubheader.h. \n 
+                       #= You can also use file 'id' given by --list-types like   @f1,@f2 \n
+                       #= You can also exclude file by putting - in front of the file
+         , *@gccoptions #= remaining options are passed to gccxml. eg -I /path/needed/by/header
+         ) {
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
+  
+  my @files = ();
+  my @user-excludes = ();
+  if $files {
+    for $files.split(',') {
+      if $_.starts-with('-') {
+        @user-excludes.push($_.substr(1));
+      } else {
+        @files.push($_);
+      }
+    }
+  }
+  if @files !== Empty {
+    note "Displaying content of : " ~ @files.join(', ');
+  }
+  if @user-excludes !== Empty {
+    note "Excluding content of : " ~ @user-excludes.join(', ');
+  }
+  
   my AllTheThings $att = do-magic($header-file, @gccoptions);
   note 'Number of things founds';
   note '-Types: ' ~ $att.types.elems;
@@ -28,6 +55,7 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
   note '-Variables: ' ~ $att.variables.elems;
   note '-Files: ' ~ $att.files.elems;
   note "Time to generate stuff\n\n";
+
   
   if $list-types {
     my %tdisplay;
@@ -75,6 +103,7 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
   #  oog-config($ooc);
   #  oog-generate();
   #}
+  
   if $define-enum {
     my ($enum-name, $enum-pattern) := $define-enum.split(':');
     my CEnum $e .= new(:name($enum-name), :id(-1));
@@ -95,41 +124,99 @@ sub MAIN($header-file, Bool :$all, Str :$define-enum, Str :$ooc, Bool :$enums,
       $att.enums.push($e);
     }    
   }
+  # GENERATE STUFF (exclusion are made in sort-by-file)
   dg-init($att);
   if $enums or $all or $define-enum {
     say '## Enumerations';
-    dg-generate-enums();
-  }
-  if $structs or $all {
-    say '## Structures';
-    my %h = dg-generate-structs();
-    my @sorted = %h.values.sort({$^a<obj>.start-line > $^b<obj>.start-line});
-    #say @sorted;
-    for @sorted.kv -> $i, $v {
-       if $v<obj> ~~ Struct {
-         if @sorted[$i + 1].defined and @sorted[$i + 1]<obj> ~~ AnonymousUnion and @sorted[$i + 1]<obj>.struct.defined {
-           say @sorted[$i + 1]<p6str>;
-         }
-       }
-       if !($v<obj> ~~ AnonymousUnion and $v<obj>.struct.defined) {
-         say $v<p6str>;
-       }
+    my %h = dg-generate-enums();
+    my %sortedh = sort-by-file(%h.values);
+    for %sortedh.kv -> $k, @v {
+      say "\n# == {$att.files{$k}} ==\n";
+      for @v -> $ob {
+        say $ob<p6str>;
+      }
     }
   }
   
+  if $structs or $all {
+    say '## Structures' ~ "\n";
+    my %h = dg-generate-structs();
+    my %sortedh = sort-by-file(%h.values);
+    for %sortedh.kv -> $k, @v {
+      say "\n# == {$att.files{$k}} ==\n";
+      for @v.kv -> $i, $ob {
+        if $ob<obj> ~~ Struct {
+          if @v[$i + 1].defined and @v[$i + 1]<obj> ~~ AnonymousUnion and @v[$i + 1]<obj>.struct.defined {
+            say @v[$i + 1]<p6str>;
+          }
+        }
+        if !($ob<obj> ~~ AnonymousUnion and $ob<obj>.struct.defined) {
+          say $ob<p6str>;
+        }
+      }
+    }
+  }
+    
   if $functions or $all {
-    say '## Extras stuff';
+    say '## Extras stuff' ~ "\n";
     dg-generate-extra();
-    say '## Functions';
+    say '## Functions' ~ "\n";
     my %h = dg-generate-functions();
-    for %h.values -> $v {
-       say $v;
+    my %sortedh = sort-by-file(%h.values);
+    for %sortedh.kv -> $k, @v {
+      say "\n# == {$att.files{$k}} ==\n";
+      for @v -> $ob {
+        say $ob<p6str>;
+      }
     }
   }
   
   if $externs or $all {
-    say '## Externs';
-    dg-generate-externs();
+    say '## Externs' ~ "\n";
+    my %h = dg-generate-externs();
+    my %sortedh = sort-by-file(%h.values);
+    for %sortedh.kv -> $k, @v {
+      say "\n# == {$att.files{$k}} ==\n";
+      for @v -> $ob {
+        say $ob<p6str>;
+      }
+    }
+  }
+  
+  sub files-filter($file-id, $file) returns Bool {
+    my $basename = $file.IO.basename;
+    
+    #Autoexclude stuff
+    return False if $basename ~~ /^std/;
+    return False if $basename ~~ /^pthread/;
+    return False if $basename eq 'libio.h';
+    return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/bits/'/;
+    return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/sys/'/;
+    
+    if @files !== Empty {
+      if $basename (<=) @files || ('@' ~ $file-id) (<=)  @files {
+        return True;
+      }
+      return False;
+    }
+    if @user-excludes !== Empty {
+      if $basename (<=) @user-excludes || ('@' ~ $file-id) (<=)  @user-excludes {
+        return False;
+      }
+      return True;
+    }
+    return True;
+  }
+  
+  sub sort-by-file(@array) {
+    my %toret;
+    for @array -> %s {
+      %toret{%s<obj>.file-id}.push(%s) if files-filter(%s<obj>.file-id, $att.files{%s<obj>.file-id});
+    }
+    for %toret.keys -> $k {
+      @(%toret{$k}).sort: {$^a<obj>.start-line > $^b<obj>.start-line};
+    }
+    return %toret;
   }
 }
 
