@@ -6,7 +6,7 @@ use GPT::DumbGenerator;
 
 
 
-
+my $gmerge-stypedef;
 
 sub MAIN($header-file #= The header file
          , Bool :$all #= Generate everything
@@ -18,15 +18,19 @@ sub MAIN($header-file #= The header file
          , Bool :$externs #= Generate extern declaration
          , Bool :$list-types #= Mostly for debug purpose, list all the C type found
          , Bool :$list-files #= List all the files involved
-         , Str :$files #= WIP Allow you to pick from which files you want to generate stuff. eg --files=myheader.h,mysubheader.h. \n 
-                       #= You can also use file 'id' given by --list-types like   @f1,@f2 \n
+         , Str :$files #= WIP Allow you to pick from which files you want to generate stuff. eg --files=myheader.h,mysubheader.h.
+                       #=
+                       #= You can also use file 'id' given by --list-types like   @f1,@f2
+                       #=
                        #= You can also exclude file by putting - in front of the file
+         , Bool :$merge-stypedef #= Merge a typedef pointing to a struct type to the struct name
          , *@gccoptions #= remaining options are passed to gccxml. eg -I /path/needed/by/header
          ) {
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
   
+  $gmerge-stypedef = $merge-stypedef;
   my @files = ();
   my @user-excludes = ();
   if $files {
@@ -127,8 +131,8 @@ sub MAIN($header-file #= The header file
   # GENERATE STUFF (exclusion are made in sort-by-file)
   dg-init($att);
   if $enums or $all or $define-enum {
-    say '## Enumerations';
     my %h = dg-generate-enums();
+    say '## Enumerations';
     my %sortedh = sort-by-file(%h.values);
     for %sortedh.kv -> $k, @v {
       say "\n# == {$att.files{$k}} ==\n";
@@ -139,8 +143,8 @@ sub MAIN($header-file #= The header file
   }
   
   if $structs or $all {
-    say '## Structures' ~ "\n";
     my %h = dg-generate-structs();
+    say '## Structures' ~ "\n";
     my %sortedh = sort-by-file(%h.values);
     for %sortedh.kv -> $k, @v {
       say "\n# == {$att.files{$k}} ==\n";
@@ -160,8 +164,8 @@ sub MAIN($header-file #= The header file
   if $functions or $all {
     say '## Extras stuff' ~ "\n";
     dg-generate-extra();
-    say '## Functions' ~ "\n";
     my %h = dg-generate-functions();
+    say '## Functions' ~ "\n";
     my %sortedh = sort-by-file(%h.values);
     for %sortedh.kv -> $k, @v {
       say "\n# == {$att.files{$k}} ==\n";
@@ -190,6 +194,8 @@ sub MAIN($header-file #= The header file
     return False if $basename ~~ /^std/;
     return False if $basename ~~ /^pthread/;
     return False if $basename eq 'libio.h';
+    return False if $basename eq 'string.h';
+    return False if $basename eq 'errno.h';
     return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/bits/'/;
     return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/sys/'/;
     
@@ -390,7 +396,17 @@ sub do-magic($header, @other) {
     }
   }
   resolvetype();
-
+  
+  sub merge-stypedef {
+    for %types.kv -> $id, $t {
+      if $t ~~ TypeDefType and $t.ref-type ~~ StructType {
+        %types{$id} = $t.ref-type;
+        $t.ref-type.name = $t.name;
+        %structs{$t.ref-id}.name = $t.name;
+      }
+    }
+  }
+  merge-stypedef() if $gmerge-stypedef;
   for @cfunctions -> $f {
     $f.returns = %types{$f.returns-id};
     for $f.arguments -> $a {
