@@ -220,7 +220,7 @@ sub MAIN($header-file #= The header file
       %toret{%s<obj>.file-id}.push(%s) if files-filter(%s<obj>.file-id, $att.files{%s<obj>.file-id});
     }
     for %toret.keys -> $k {
-      @(%toret{$k}).sort: {$^a<obj>.start-line > $^b<obj>.start-line};
+      @(%toret{$k}).=sort: {$^a<obj>.start-line > $^b<obj>.start-line};
     }
     return %toret;
   }

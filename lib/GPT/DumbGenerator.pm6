@@ -120,19 +120,41 @@ sub dg-generate-extra is export {
     }
 }
 
+sub extract-func-definition($func) {
+  my $fh = open $allthings.files{$func.file-id};
+  my $i = $func.start-line - 1;
+  my @lines = $fh.lines;
+  my @tmp = ();
+  @tmp.push(@lines[$i--]);
+  while @lines[$i].chars > 0 {
+    last if @lines[$i].contains(';');
+    @tmp.push(@lines[$i--]);
+  }
+  return @tmp.reverse;
+}
+
 sub dg-generate-functions is export {
   my %toret;
   for $allthings.functions -> $f {
     my @tmp = ();
     debug "Function (" ~ $allthings.files{$f.file-id} ~ ':' ~ $f.start-line ~ "):" ~ $f.name;
-    for $f.arguments.kv -> $i, $a {
-      debug "Param $i : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
-      @tmp.push(resolve-type($a.type) ~ ' ' ~ ($a.name.defined ?? '$' ~ $a.name !! ''));
+    if $f.arguments.elems > 1 {
+      for $f.arguments.kv -> $i, $a {
+        debug "Param $i : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
+        @tmp.push(sprintf("%-30s%s # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type));
+      }
+    } 
+    if $f.arguments.elems == 1 {
+      my $a = $f.arguments[0];
+      debug "Param : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
+      @tmp.push(sprintf("%s %s, # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type));
     }
     debug "Returns";
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
            "returns " ~ resolve-type($f.returns);
-    my $p6gen = "sub {$f.name}(" ~  @tmp.join(', ') ~ ") is native(LIB) $returns is export \{ * \}";
+    my $decl-size = "sub {$f.name}(".chars;
+    my $p6gen = "#-From " ~ $allthings.files{$f.file-id} ~ ':' ~ $f.start-line ~ "\n" ~ (extract-func-definition($f).map:{'#' ~ $_}).join("\n") ~ "\n";
+    $p6gen ~= "sub {$f.name}(" ~  @tmp.join(sprintf("\n%{$decl-size - 1}s,", ' ')) ~ "\n" ~ ' ' x $decl-size ~ ") is native(LIB) $returns is export \{ * \}\n";
     %toret{$f.name}<p6str> = $p6gen;
     %toret{$f.name}<obj> = $f;
   }
