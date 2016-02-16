@@ -72,7 +72,12 @@ sub	resolve-type($t, $cpt = 0) is export {
       ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'char');
     return 'Pointer' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'void') ||
       ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void');
-    return 'Pointer[PtrFunc]' if $t.ref-type ~~ FunctionType;
+    if $t.ref-type ~~ FunctionType {
+      return '(' ~ ($t.ref-type.arguments-type.map:{resolve-type($_)}).join(', ') ~ 
+      ($t.ref-type.return-type ~~ FundamentalType && $t.ref-type.return-type.name eq 'void' ?? '' 
+      !! ' --> ' ~ resolve-type($t.ref-type.return-type)) 
+      ~ ')';
+    }
     return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1) ~ ']';
     
   }
@@ -141,13 +146,28 @@ sub dg-generate-functions is export {
     if $f.arguments.elems > 1 {
       for $f.arguments.kv -> $i, $a {
         debug "Param $i : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
-        @tmp.push(sprintf("%-30s%s # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type));
+        my $tmp;
+        if $a.type ~~ PointerType && $a.type.ref-type ~~ FunctionType ||
+         $a.type ~~ TypeDefType && $a.type.ref-type ~~ PointerType && $a.type.ref-type.ref-type ~~ FunctionType {
+          $tmp = sprintf('&%s %s # %s', ($a.name.defined ?? $a.name !! ''), resolve-type($a.type),  ~$a.type);        
+        } else {
+          $tmp = sprintf("%-30s%s # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type);
+        }
+        @tmp.push($tmp);
       }
     } 
     if $f.arguments.elems == 1 {
       my $a = $f.arguments[0];
       debug "Param : " ~ ($a.name.defined ?? '$' ~ $a.name !! '');
-      @tmp.push(sprintf("%s %s, # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type));
+      my $tmp;
+      #Callback have a different syntax
+      if $a.type ~~ PointerType && $a.type.ref-type ~~ FunctionType ||
+         $a.type ~~ TypeDefType && $a.type.ref-type ~~ PointerType && $a.type.ref-type.ref-type ~~ FunctionType {
+        $tmp = sprintf('%s %s # %s', ($a.name.defined ?? '&' ~ $a.name !! ''), resolve-type($a.type),  ~$a.type);        
+      } else {
+        $tmp = sprintf("%s %s # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type);
+      }
+      @tmp.push($tmp);
     }
     debug "Returns";
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!

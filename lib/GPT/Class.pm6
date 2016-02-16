@@ -45,7 +45,7 @@ class QualifiedType is IndirectType is export {
 class TypeDefType is IndirectType is export {
   has $.name is rw;
   method Str {
-    return "Typedef($!name)->|" ~  $.ref-type.Str ~ "|";
+    return "Typedef<$!name>->|" ~  $.ref-type.Str ~ "|";
   }
 }
 
@@ -55,9 +55,13 @@ class UnionType is DirectType is export {
   }
 }
 
-class FunctionType is DirectType is export {
+class FunctionType is DirectType is export is rw {
+  has	Type @.arguments-type;
+  has	@.arguments-type-id;
+  has	Type $.return-type;
+  has	$.return-type-id;
   method Str {
-    'PtrFunc';
+    'F:' ~ $.return-type.Str ~ ' ( ' ~ (@.arguments-type.map:{.Str}).join(', ') ~ ')';
   }
 }
 

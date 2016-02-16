@@ -8,7 +8,8 @@ use GPT::DumbGenerator;
 
 my $gmerge-stypedef;
 
-sub MAIN($header-file #= The header file
+sub MAIN(
+          $header-file #= The header file
          , Bool :$all #= Generate everything
          , Str :$define-enum #= Try to generate enumeration from #define using the given starting pattern
          , Str :$ooc #= Do nothing
@@ -118,6 +119,7 @@ sub MAIN($header-file #= The header file
           if $line ~~ /^"#"\s*"define" \s+ ($enum-pattern\S*) \s+ (<-[\/]>+)/ {
             my EnumValue $ev .= new;
             $ev.name = $0;
+            $e.file-id = $k;
             $ev.init = $1;
             $e.values.push($ev);
           }
@@ -268,6 +270,10 @@ sub do-magic($header, @other) {
       }
       when 'FunctionType' {
          my FunctionType $t .= new(:id($elem<id>));
+         $t.return-type-id = $elem<returns>;
+         for $elem.elements() -> $arg {
+           $t.arguments-type-id.push($arg<type>);
+         }
          %types{$t.id} = $t;
       }
       when 'PointerType' {
@@ -406,6 +412,16 @@ sub do-magic($header, @other) {
       }
     }
   }
+  #Handle functionType
+  for %types.kv -> $k, $v {
+    if $v ~~ FunctionType {
+      $v.return-type = %types{$v.return-type-id};
+      for $v.arguments-type-id -> $id {
+        $v.arguments-type.push(%types{$id});
+      }
+    }
+  }
+  
   merge-stypedef() if $gmerge-stypedef;
   for @cfunctions -> $f {
     $f.returns = %types{$f.returns-id};
