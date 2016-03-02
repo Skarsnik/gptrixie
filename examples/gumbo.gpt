@@ -1,0 +1,7 @@
+(
+module-name => 'Gumbo::Binding',
+merge-struct-typedef => True,
+files => ['gumbo.h'],
+exclude-enums => ['GumboTag']
+);
+
