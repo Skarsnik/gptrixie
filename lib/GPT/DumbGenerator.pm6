@@ -82,6 +82,10 @@ sub	resolve-type($t, $cpt = 0, :$context = "Foo") is export {
         return 'Pointer';
       }
     }
+    return resolve-type($t.ref-type, $cpt + 1) if ($t.ref-type ~~ StructType) ||
+      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ StructType) ||
+      ($t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ StructType) ||
+      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ TypeDefType and $t.ref-type.ref-type.ref-type ~~ StructType);
     return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1, :$context) ~ ']';
     
   }
@@ -235,7 +239,7 @@ sub dg-generate-structs is export {
 sub	dg-generate-externs is export {
   my %toret;
   for $allthings.variables -> $v {
-    %toret{$v.name}<p6str> =  'our '~ resolve-type($v.type) ~ ' $' ~ $v.name ~ ' is export = cglobals(LIB, "' ~ $v.name ~ '", ' ~ resolve-type($v.type) ~ ');';
+    %toret{$v.name}<p6str> =  'our $' ~ $v.name ~ ' is export = cglobal(LIB, "' ~ $v.name ~ '", ' ~ resolve-type($v.type) ~ ');';
     %toret{$v.name}<obj> = $v;
   }
   return %toret;

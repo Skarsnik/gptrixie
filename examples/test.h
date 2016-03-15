@@ -21,6 +21,12 @@ struct s2 {
   double	d[4];
 };
 
+typedef struct s2 type2;
+
+struct s3 {
+  type2 foo;
+};
+
 void	pretty_print(const char *toprint);
 void	*do_stuff(s1 s, 
 	  size_t piko,
@@ -29,3 +35,4 @@ void	*do_stuff(s1 s,
  		);
 
 int  flood(char &ref);
+void testhello(type2 n);

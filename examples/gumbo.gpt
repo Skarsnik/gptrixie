@@ -1,5 +1,8 @@
 (
 module-name => 'Gumbo::Binding',
+env-name => 'PERL6_GUMBOLIB',
+clib-name => 'gumbo',
+clib-abiversion => v1,
 merge-struct-typedef => True,
 files => ['gumbo.h'],
 exclude-enums => ['GumboTag']
