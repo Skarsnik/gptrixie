@@ -7,6 +7,7 @@
     "provides"      : {
         "GPT::Class"		 : "lib/GPT/Class.pm6",
         "GPT::DumbGenerator"     : "lib/GPT/DumbGenerator.pm6",
+        "GPT::FileGenerator"	 : "lib/FileGenerator.pm6",
         "gptrixie"		 : "bin/gptrixie"
     },
     "source-url"    : "git://github.com/Skarsnik/gptrixie.git"
