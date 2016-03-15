@@ -1,3 +1,5 @@
+
+
 module GPT::Class {
 
 #Type class. they only represent a Type

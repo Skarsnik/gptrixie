@@ -61,7 +61,7 @@ my %stdinttype-to-p6 = (
 
 
 
-sub	resolve-type($t, $cpt = 0) is export {
+sub	resolve-type($t, $cpt = 0, :$context = "Foo") is export {
   debug "==" x $cpt ~ $t.id ~ ' ' ~ $t.WHAT.perl ~ ' ' ~ $t;
   if $t ~~ PointerType {
     debug "ref-type : " ~ $t.ref-type.id ~ '/'  ~ $t.ref-id ~ ' '~ $t.ref-type.WHAT.perl ~ " - " ~ $t.ref-type;
@@ -73,16 +73,20 @@ sub	resolve-type($t, $cpt = 0) is export {
     return 'Pointer' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'void') ||
       ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void');
     if $t.ref-type ~~ FunctionType {
-      return '(' ~ ($t.ref-type.arguments-type.map:{resolve-type($_)}).join(', ') ~ 
-      ($t.ref-type.return-type ~~ FundamentalType && $t.ref-type.return-type.name eq 'void' ?? '' 
-      !! ' --> ' ~ resolve-type($t.ref-type.return-type)) 
-      ~ ')';
+      if $context eq 'function' {
+        return '(' ~ ($t.ref-type.arguments-type.map:{resolve-type($_)}).join(', ') ~ 
+        ($t.ref-type.return-type ~~ FundamentalType && $t.ref-type.return-type.name eq 'void' ?? '' 
+        !! ' --> ' ~ resolve-type($t.ref-type.return-type)) 
+        ~ ')';
+      } else {
+        return 'Pointer';
+      }
     }
-    return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1) ~ ']';
+    return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1, :$context) ~ ']';
     
   }
   if $t ~~ ArrayType {
-    return 'CArray[' ~ resolve-type($t.ref-type, $cpt + 1) ~ ']';
+    return 'CArray[' ~ resolve-type($t.ref-type, $cpt + 1, :$context) ~ ']';
   }
   if $t ~~ FundamentalType {
     if %ctype-to-p6{$t.name}:exists {
@@ -105,7 +109,7 @@ sub	resolve-type($t, $cpt = 0) is export {
     return 'size_t' if $t.name eq 'size_t';
     return $t.name if $t.ref-type ~~ FundamentalType;
     return %stdinttype-to-p6{$t.name} if %stdinttype-to-p6{$t.name};
-    return resolve-type($t.ref-type, $cpt + 1);
+    return resolve-type($t.ref-type, $cpt + 1, :$context);
   }
   if $t ~~ UnionType {
     return $allthings.unions{$t.id} ~~ AnonymousUnion ?? $allthings.unions{$t.id}.gen-name 
@@ -149,9 +153,9 @@ sub dg-generate-functions is export {
         my $tmp;
         if $a.type ~~ PointerType && $a.type.ref-type ~~ FunctionType ||
          $a.type ~~ TypeDefType && $a.type.ref-type ~~ PointerType && $a.type.ref-type.ref-type ~~ FunctionType {
-          $tmp = sprintf('&%s %s # %s', ($a.name.defined ?? $a.name !! ''), resolve-type($a.type),  ~$a.type);        
+          $tmp = sprintf('&%s %s # %s', ($a.name.defined ?? $a.name !! ''), resolve-type($a.type, :context<function>),  ~$a.type);        
         } else {
-          $tmp = sprintf("%-30s%s # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type);
+          $tmp = sprintf("%-30s%s # %s", resolve-type($a.type, :context<function>), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type);
         }
         @tmp.push($tmp);
       }
@@ -163,15 +167,15 @@ sub dg-generate-functions is export {
       #Callback have a different syntax
       if $a.type ~~ PointerType && $a.type.ref-type ~~ FunctionType ||
          $a.type ~~ TypeDefType && $a.type.ref-type ~~ PointerType && $a.type.ref-type.ref-type ~~ FunctionType {
-        $tmp = sprintf('%s %s # %s', ($a.name.defined ?? '&' ~ $a.name !! ''), resolve-type($a.type),  ~$a.type);        
+        $tmp = sprintf('%s %s # %s', ($a.name.defined ?? '&' ~ $a.name !! ''), resolve-type($a.type, :context<function>),  ~$a.type);        
       } else {
-        $tmp = sprintf("%s %s # %s", resolve-type($a.type), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type);
+        $tmp = sprintf("%s %s # %s", resolve-type($a.type, :context<function>), ($a.name.defined ?? '$' ~ $a.name !! ''), ~$a.type);
       }
       @tmp.push($tmp);
     }
     debug "Returns";
     my $returns = ($f.returns ~~ FundamentalType && $f.returns.name eq 'void') ?? '' !!
-           "returns " ~ resolve-type($f.returns);
+           "returns " ~ resolve-type($f.returns, :context<function>);
     my $decl-size = "sub {$f.name}(".chars;
     my $p6gen = "#-From " ~ $allthings.files{$f.file-id} ~ ':' ~ $f.start-line ~ "\n" ~ (extract-func-definition($f).map:{'#' ~ $_}).join("\n") ~ "\n";
     $p6gen ~= "sub {$f.name}(" ~  @tmp.join(sprintf("\n%{$decl-size - 1}s,", ' ')) ~ "\n" ~ ' ' x $decl-size ~ ") is native(LIB) $returns is export \{ * \}\n";

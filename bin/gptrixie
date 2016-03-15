@@ -1,9 +1,10 @@
 use XML;
 use GPT::Class;
 use GPT::DumbGenerator;
+use GPT::FileGenerator;
 #use OOGenerator;
 
-
+my $GCC_XML = %*ENV<GPT_GCCXML> || 'gccxml';
 
 
 my $gmerge-stypedef;
@@ -21,17 +22,25 @@ sub MAIN(
          , Bool :$list-files #= List all the files involved
          , Str :$files #= WIP Allow you to pick from which files you want to generate stuff. eg --files=myheader.h,mysubheader.h.
                        #=
-                       #= You can also use file 'id' given by --list-types like   @f1,@f2
+                       #= You can also use file 'id' given by --list-files like   @f1,@f2
                        #=
                        #= You can also exclude file by putting - in front of the file
          , Bool :$merge-stypedef #= Merge a typedef pointing to a struct type to the struct name
+         , Str  :$gptfile # = Use the given GPT file to generate a module, all other (gpt) options are ignored
          , *@gccoptions #= remaining options are passed to gccxml. eg -I /path/needed/by/header
          ) {
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
   
-  $gmerge-stypedef = $merge-stypedef;
+  if $gptfile.defined {
+    read-gpt-file($gptfile);
+    $gmerge-stypedef = %GPT::FileGenerator::conf<merge-struct-typedef>:exists;
+    my AllTheThings $att = do-magic($header-file, @gccoptions);
+    generate-module($att);
+    return 0;
+  }
+  $gmerge-stypedef =  $merge-stypedef;
   my @files = ();
   my @user-excludes = ();
   if $files {
@@ -246,8 +255,8 @@ sub do-magic($header, @other) {
   my %times;
 
   my $t = now;
-  note "Calling GCCXML : gccxml $header -fxml=plop.xml", @other;
-  run "gccxml",  $header, "-fxml=plop.xml", @other;
+  note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml", @other;
+  run $GCC_XML,  $header, "-fxml=plop.xml", @other;
   %times<gccxml> = now - $t;
   $t = now;
   note "Parsing the XML file";
