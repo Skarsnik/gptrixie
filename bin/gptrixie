@@ -5,7 +5,8 @@ use GPT::FileGenerator;
 #use OOGenerator;
 
 my $GCC_XML = %*ENV<GPT_GCCXML> || 'gccxml';
-
+my $CASTXML_STD = 'c89';
+my $CASTXML = False;
 
 my $gmerge-stypedef;
 
@@ -26,7 +27,8 @@ sub MAIN(
                        #=
                        #= You can also exclude file by putting - in front of the file
          , Bool :$merge-stypedef #= Merge a typedef pointing to a struct type to the struct name
-         , Str  :$gptfile # = Use the given GPT file to generate a module, all other (gpt) options are ignored
+         , Str  :$gptfile #= Use the given GPT file to generate a module, all other (gpt) options are ignored
+         , Str :$castxml #= allow for gptrixie to use castxml, you need to specificy the C standard
          , *@gccoptions #= remaining options are passed to gccxml. eg -I /path/needed/by/header
          ) {
   if $define-enum.defined and ! $define-enum.index(':').defined {
@@ -39,6 +41,10 @@ sub MAIN(
     my AllTheThings $att = do-magic($header-file, @gccoptions);
     generate-module($att);
     return 0;
+  }
+  if $castxml.defined {
+    $CASTXML = True;
+    $CASTXML_STD = $castxml if $castxml ne '';
   }
   $gmerge-stypedef =  $merge-stypedef;
   my @files = ();
@@ -255,8 +261,14 @@ sub do-magic($header, @other) {
   my %times;
 
   my $t = now;
-  note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml", @other;
-  run $GCC_XML,  $header, "-fxml=plop.xml", @other;
+  if $CASTXML {
+    my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', 'plop.xml', $header, @other;
+    note "Calling castxml : " ~ @arg.join(' ');
+    run 'castxml', @arg;
+  } else {
+    note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml", @other;
+    run $GCC_XML,  $header, "-fxml=plop.xml", @other;
+  }
   %times<gccxml> = now - $t;
   $t = now;
   note "Parsing the XML file";
@@ -441,7 +453,7 @@ sub do-magic($header, @other) {
   for %fields.kv ->  $id, $f {
     $f.type = %types{$f.type-id};
     if $f.type ~~ UnionType {
-      %cunions{$f.type.id}.field = $f;
+      %cunions{$f.type.id}.field = $f if %cunions{$f.type.id} ~~ AnonymousUnion;
     }
   }
   for %cunions.kv -> $k, $cu {
