@@ -262,11 +262,11 @@ sub do-magic($header, @other) {
 
   my $t = now;
   if $CASTXML {
-    my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', 'plop.xml', $header, @other;
+    my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', 'plop.xml', $header, |@other;
     note "Calling castxml : " ~ @arg.join(' ');
     run 'castxml', @arg;
   } else {
-    note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml", @other;
+    note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml", |@other;
     run $GCC_XML,  $header, "-fxml=plop.xml", @other;
   }
   %times<gccxml> = now - $t;
