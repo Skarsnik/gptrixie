@@ -1,4 +1,5 @@
 {
+    "perl"          : "6.*",
     "name"          : "App::GPTrixie",
     "version"       : "*",
     "description"   : "Generate NativeCall code from C headers file",
