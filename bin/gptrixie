@@ -266,7 +266,7 @@ sub do-magic($header, @other) {
     note "Calling castxml : " ~ @arg.join(' ');
     run 'castxml', @arg;
   } else {
-    note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml", |@other;
+    note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml ", |@other;
     run $GCC_XML,  $header, "-fxml=plop.xml", @other;
   }
   %times<gccxml> = now - $t;
@@ -292,7 +292,7 @@ sub do-magic($header, @other) {
       when 'FunctionType' {
          my FunctionType $t .= new(:id($elem<id>));
          $t.return-type-id = $elem<returns>;
-         for $elem.elements() -> $arg {
+         for $elem.elements(:name<Argument>) -> $arg {
            $t.arguments-type-id.push($arg<type>);
          }
          %types{$t.id} = $t;
