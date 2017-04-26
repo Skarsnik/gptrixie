@@ -1,6 +1,7 @@
 {
     "perl"          : "6.*",
     "name"          : "App::GPTrixie",
+    "license"       : "Artistic-2.0",
     "version"       : "*",
     "description"   : "Generate NativeCall code from C headers file",
     "author"        : "Sylvain 'Skarsnik' Colinet <scolinet@gmail.com>",
