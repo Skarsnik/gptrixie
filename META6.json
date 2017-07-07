@@ -12,5 +12,6 @@
         "GPT::FileGenerator"	 : "lib/GPT/FileGenerator.pm6",
         "gptrixie"		 : "bin/gptrixie"
     },
-    "source-url"    : "git://github.com/Skarsnik/gptrixie.git"
+    "source-url"    : "git://github.com/Skarsnik/gptrixie.git",
+    "tags" : [ "NativeCall", "Authoring", "Generator"]
 }
