@@ -1,0 +1,19 @@
+[
+{
+module-name => 'LibXML2::Parser::Binding',
+env-name => 'PERL6_LIBXML2LIB',
+clib-name => 'xml2',
+clib-abiversion => v2,
+merge-struct-typedef => True,
+files => ['parser.h'],
+},
+{
+module-name => 'LibXML2::Tree::Binding',
+env-name => 'PERL6_LIBXML2LIB',
+clib-name => 'xml2',
+clib-abiversion => v2,
+merge-struct-typedef => True,
+files => ['tree.h'],
+}
+];
+

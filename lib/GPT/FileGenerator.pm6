@@ -8,10 +8,14 @@ module GPT::FileGenerator {
 
   sub read-gpt-file($filepath) is export {
     use MONKEY-SEE-NO-EVAL;
-    %conf = EVAL($filepath.IO.slurp);
+    my $gpt-conf = EVAL($filepath.IO.slurp);
+    %conf = $gpt-conf if $gpt-conf ~~ Hash;
+    if $gpt-conf ~~ Array {
+    }
+
   }
 
-  sub generate-module($att) is export {
+  sub generate-modules($att) is export {
     dg-init($att);
     @files := %conf<files> if %conf<files>:exists;
     @user-excludes := %conf<exclude-files> if %conf<exclude-files>:exists;

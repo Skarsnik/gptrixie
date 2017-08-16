@@ -28,6 +28,9 @@ class PointerType is IndirectType is export {
 class StructType is DirectType is export {
 }
 
+class ClassType is DirectType is export {
+}
+
 class FundamentalType is DirectType is export {
 }
 

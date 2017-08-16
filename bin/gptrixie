@@ -351,6 +351,10 @@ sub do-magic($header, @other) {
         my StructType $t .= new(:id($s.id), :name($s.name));
         %types{$t.id} = $t;
       }
+      when 'Class' { #FIXME need to add real stuff around that
+        my ClassType $c .= new(:id($elem<id>), :name($elem<name>));
+        %types{$c.id} = $c;
+      }
       when 'Union' {
         my UnionType $t .= new(:id($elem<id>));
         %types{$t.id} = $t;
@@ -394,7 +398,7 @@ sub do-magic($header, @other) {
         @cfunctions.push($f)
       }
       when 'Variable' {
-        if $elem<extern> == 1 {
+        if $elem<extern>.defined and $elem<extern> == 1 {
           my ExternVariable $e .= new(:id($elem<id>), :name($elem<name>));
           $e.type-id = $elem<type>;
           $e.set-clocation($elem);
@@ -418,6 +422,11 @@ sub do-magic($header, @other) {
 	    $t.ref-type = %types{$t.ref-id};
 	    $change = True;
 	  }
+	CATCH {
+		default {
+			say $t.perl;
+		}
+	}
 	}
       }
     }
