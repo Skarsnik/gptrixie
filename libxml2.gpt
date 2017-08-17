@@ -5,7 +5,7 @@ env-name => 'PERL6_LIBXML2LIB',
 clib-name => 'xml2',
 clib-abiversion => v2,
 merge-struct-typedef => True,
-files => ['parser.h'],
+files => ['parser.h', 's:xmlIO.h'],
 },
 {
 module-name => 'LibXML2::Tree::Binding',

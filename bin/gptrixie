@@ -37,9 +37,9 @@ sub MAIN(
   
   if $gptfile.defined {
     read-gpt-file($gptfile);
-    $gmerge-stypedef = %GPT::FileGenerator::conf<merge-struct-typedef>:exists;
+    $gmerge-stypedef = $GPT::FileGenerator::merge-typedef-struct;
     my AllTheThings $att = do-magic($header-file, @gccoptions);
-    generate-module($att);
+    generate-modules($att);
     return 0;
   }
   if $castxml.defined {
