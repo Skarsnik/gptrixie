@@ -2,6 +2,17 @@
 
 module GPT::Class {
 
+role CLocation is rw is export {
+  has	$.file-id;
+  has	$.file;
+  has	$.start-line;
+  
+  method set-clocation($elem) {
+    $!file-id = $elem.attribs<file>;
+    $!start-line = $elem.attribs<line>;
+  }
+}
+
 #Type class. they only represent a Type
 role Type is export {
   has	$.id is rw;
@@ -25,7 +36,7 @@ class PointerType is IndirectType is export {
   }
 }
 
-class StructType is DirectType is export {
+class StructType is DirectType does CLocation is export {
 }
 
 class ClassType is DirectType is export {
@@ -47,14 +58,14 @@ class QualifiedType is IndirectType is export {
   }
 }
 
-class TypeDefType is IndirectType is export {
+class TypeDefType is IndirectType does CLocation is export {
   has $.name is rw;
   method Str {
     return "Typedef<$!name>->|" ~  $.ref-type.Str ~ "|";
   }
 }
 
-class UnionType is DirectType is export {
+class UnionType is DirectType does CLocation is export {
   method Str {
     'Union'
   }
@@ -83,16 +94,7 @@ class EnumType is DirectType is export {
 # Real class
 
 # to keep track of the location
-role CLocation is rw is export {
-  has	$.file-id;
-  has	$.file;
-  has	$.start-line;
-  
-  method set-clocation($elem) {
-    $!file-id = $elem.attribs<file>;
-    $!start-line = $elem.attribs<line>;
-  }
-}
+
 
 class Field does CLocation is rw is export {
   has	$.name;

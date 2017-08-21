@@ -2,6 +2,10 @@ use XML;
 use GPT::Class;
 use GPT::DumbGenerator;
 use GPT::FileGenerator;
+use GPT::FileFilter;
+use GPT::HandleFileDeps;
+use GPT::ListTypes;
+use GPT::ListFiles;
 #use OOGenerator;
 
 my $GCC_XML = %*ENV<GPT_GCCXML> || 'gccxml';
@@ -21,6 +25,7 @@ sub MAIN(
          , Bool :$externs #= Generate extern declaration
          , Bool :$list-types #= Mostly for debug purpose, list all the C type found
          , Bool :$list-files #= List all the files involved
+         , Str  :$list-deps #= List the dependancy from other files for this file, based on type used
          , Str :$files #= WIP Allow you to pick from which files you want to generate stuff. eg --files=myheader.h,mysubheader.h.
                        #=
                        #= You can also use file 'id' given by --list-files like   @f1,@f2
@@ -76,48 +81,14 @@ sub MAIN(
   note '-Files: ' ~ $att.files.elems;
   note "Time to generate stuff\n\n";
 
-  
+  if $list-deps.defined {
+    list-deps($att, $list-deps);
+  }
   if $list-types {
-    my %tdisplay;
-    
-    my %t = $att.types;
-    for %t.kv -> $k, $v {
-      for <FundamentalType StructType UnionType ArrayType TypeDefType> -> $cmp {
-        if $v ~~ ::($cmp) {
-          %tdisplay{$cmp}.push($v);
-          %t{$k}:delete;
-        }
-      }
-    }
-    for <FundamentalType StructType UnionType ArrayType TypeDefType> -> $cmp {
-      next unless %tdisplay{$cmp}:exists;
-      say "====$cmp (" ~ @(%tdisplay{$cmp}).elems ~ ") ====";
-      for @(%tdisplay{$cmp}) -> $t {
-        say $t.id~ ':' ~$t;
-      }
-    }
-    say "====OTHER====";
-    for %t.values {
-      say ~$_;
-    }
-    for $att.types.values {
-      if $_ ~~ IndirectType {
-        if $_.ref-type !~~ Type {
-          say "Type Error: " ~ $_.id ~ " did not get resolved";
-        }
-      }
-    }
+    list-types($att);
   }
   if $list-files {
-    for $att.files.keys.sort:{$^a.substr(1) > $^b.substr(1)} -> $k {
-      sub count-stuff(@t, $file) {
-        return (@t.grep:{$_.file-id eq $file}).elems;
-      }
-      my $func = count-stuff($att.functions, $k);
-      my $enum = count-stuff($att.enums, $k);
-      my $struct = count-stuff($att.structs.values, $k);
-      printf "%-5s%s%-50s - Functions(%d), Enums(%d), Structures(%d)\n", $k, ' : ', $att.files{$k}, $func, $enum, $struct;
-    }
+    list-files($att);
   }
   #if $ooc {
   #  oog-config($ooc);
@@ -204,37 +175,10 @@ sub MAIN(
     }
   }
   
-  sub files-filter($file-id, $file) returns Bool {
-    my $basename = $file.IO.basename;
-    
-    #Autoexclude stuff
-    return False if $basename ~~ /^std/;
-    return False if $basename ~~ /^pthread/;
-    return False if $basename eq 'libio.h';
-    return False if $basename eq 'string.h';
-    return False if $basename eq 'errno.h';
-    return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/bits/'/;
-    return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/sys/'/;
-    
-    if @files !== Empty {
-      if $basename (<=) @files || ('@' ~ $file-id) (<=)  @files {
-        return True;
-      }
-      return False;
-    }
-    if @user-excludes !== Empty {
-      if $basename (<=) @user-excludes || ('@' ~ $file-id) (<=)  @user-excludes {
-        return False;
-      }
-      return True;
-    }
-    return True;
-  }
-  
   sub sort-by-file(@array) {
     my %toret;
     for @array -> %s {
-      %toret{%s<obj>.file-id}.push(%s) if files-filter(%s<obj>.file-id, $att.files{%s<obj>.file-id});
+      %toret{%s<obj>.file-id}.push(%s) if files-filter(%s<obj>.file-id, $att.files{%s<obj>.file-id}, @user-excludes);
     }
     for %toret.keys -> $k {
       @(%toret{$k}).=sort: {$^a<obj>.start-line > $^b<obj>.start-line};
@@ -242,9 +186,6 @@ sub MAIN(
     return %toret;
   }
 }
-
-
-
 
 
 
@@ -312,6 +253,7 @@ sub do-magic($header, @other) {
       when 'Typedef' {
         my TypeDefType $t .= new(:id($elem<id>));
         $t.ref-id = $elem<type>;
+        $t.set-clocation($elem);
 #         say $elem<name>;
 #         say $t.ref-id;
         $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
@@ -349,6 +291,7 @@ sub do-magic($header, @other) {
         $s.file = %files{$s.file-id};
         %structs{$s.id} = $s;
         my StructType $t .= new(:id($s.id), :name($s.name));
+        $t.set-clocation($elem);
         %types{$t.id} = $t;
       }
       when 'Class' { #FIXME need to add real stuff around that
@@ -358,6 +301,7 @@ sub do-magic($header, @other) {
       when 'Union' {
         my UnionType $t .= new(:id($elem<id>));
         %types{$t.id} = $t;
+        $t.set-clocation($elem);
         my $u;
         with $elem<name> {
           $u = CUnion.new(:id($elem<id>));

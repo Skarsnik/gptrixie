@@ -1,5 +1,6 @@
 use GPT::Class;
 use GPT::DumbGenerator;
+use GPT::FileFilter;
 
 module GPT::FileGenerator {
   our $merge-typedef-struct;
@@ -52,7 +53,7 @@ module GPT::FileGenerator {
       $fh.say: 'constant LIB = &GenMyLibName;';
       my %h = dg-generate-enums();
       $fh.say: '## Enumerations';
-      my %sortedh = sort-by-file(%h.values);
+      my %sortedh = sort-by-file(%h.values, :context('e'));
       for %sortedh.kv -> $k, @v {
         $fh.say: "\n# == {$att.files{$k}} ==\n";
         for @v -> $ob {
@@ -64,7 +65,7 @@ module GPT::FileGenerator {
       %h = dg-generate-structs();
       $fh.say: "";
       $fh.say: '## Structures' ~ "\n";
-      %sortedh = sort-by-file(%h.values);
+      %sortedh = sort-by-file(%h.values, :context('s'));
       for %sortedh.kv -> $k, @v {
         $fh.say: "\n# == {$att.files{$k}} ==\n";
         for @v.kv -> $i, $ob {
@@ -83,7 +84,7 @@ module GPT::FileGenerator {
       dg-generate-extra();
       %h = dg-generate-functions();
       $fh.say: '## Functions' ~ "\n";
-      %sortedh = sort-by-file(%h.values);
+      %sortedh = sort-by-file(%h.values, :context('f'));
       for %sortedh.kv -> $k, @v {
         $fh.say: "\n# == {$att.files{$k}} ==\n";
         for @v -> $ob {
@@ -101,37 +102,11 @@ module GPT::FileGenerator {
         }
       }
   }
-  sub files-filter($file-id, $file) returns Bool {
-    my $basename = $file.IO.basename;
-    
-    #Autoexclude stuff
-    return False if $basename ~~ /^std/;
-    return False if $basename ~~ /^pthread/;
-    return False if $basename eq 'libio.h';
-    return False if $basename eq 'string.h';
-    return False if $basename eq 'errno.h';
-    return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/bits/'/;
-    return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/sys/'/;
-    
-    if @files !== Empty {
-      if $basename (<=) @files || ('@' ~ $file-id) (<=)  @files {
-        return True;
-      }
-      return False;
-    }
-    if @user-excludes !== Empty {
-      if $basename (<=) @user-excludes || ('@' ~ $file-id) (<=)  @user-excludes {
-        return False;
-      }
-      return True;
-    }
-    return True;
-  }
   
-  sub sort-by-file(@array) {
+  sub sort-by-file(@array, :$context) {
     my %toret;
     for @array -> %s {
-      %toret{%s<obj>.file-id}.push(%s) if files-filter(%s<obj>.file-id, $att.files{%s<obj>.file-id});
+      %toret{%s<obj>.file-id}.push(%s) if files-filter(%s<obj>.file-id, $att.files{%s<obj>.file-id}, @user-excludes, :context($context));
     }
     for %toret.keys -> $k {
       @(%toret{$k}).=sort: {$^a<obj>.start-line > $^b<obj>.start-line};
