@@ -1,0 +1,9 @@
+language: perl6
+env:
+    - PERL=/usr/bin/perl
+
+perl6:
+    - latest
+sudo: false
+install:
+    - rakudobrew build-zef && zef install .
