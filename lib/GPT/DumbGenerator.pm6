@@ -139,7 +139,7 @@ sub extract-func-definition($func) {
   my @lines = $fh.lines;
   my @tmp = ();
   @tmp.push(@lines[$i--]);
-  while @lines[$i].chars > 0 {
+  while $i >= 0 && @lines[$i].chars > 0 {
     last if @lines[$i].contains(';');
     @tmp.push(@lines[$i--]);
   }
