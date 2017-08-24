@@ -10,7 +10,7 @@
         "GPT::Class"		 : "lib/GPT/Class.pm6",
         "GPT::DumbGenerator"     : "lib/GPT/DumbGenerator.pm6",
         "GPT::FileGenerator"	 : "lib/GPT/FileGenerator.pm6",
-	"GPT::FileFilter"	 : "lib/GPT/FileTiler.pm6",
+	"GPT::FileFilter"	 : "lib/GPT/FileFiler.pm6",
 	"GPT::HandleFileDeps"	 : "lib/GPT/HandleFileDeps.pm6",
 	"GPT::ListTypes"	 : "lib/GPT/ListTypes.pm6",
 	"GPT::ListFiles"	 : "lib/GPT/ListFiles.pm6",
