@@ -11,14 +11,20 @@ use GPT::ListFiles;
 my $GCC_XML = %*ENV<GPT_GCCXML> || 'gccxml';
 my $CASTXML_STD = 'c89';
 my $CASTXML = False;
+my $SILENT = False;
 
 my $gmerge-stypedef;
+
+sub gpt-note ($msg) {
+   note $msg unless $SILENT;
+}
 
 sub MAIN(
           $header-file #= The header file
          , Bool :$all #= Generate everything
          , Str :$define-enum #= Try to generate enumeration from #define using the given starting pattern
          , Str :$ooc #= Do nothing
+         , Bool :$silent = False #= Remove all output on stderr
          , Bool :$enums #= Generate enumerations
          , Bool :$functions #= Generate functions
          , Bool :$structs #= Generate structures and unions
@@ -39,7 +45,7 @@ sub MAIN(
   if $define-enum.defined and ! $define-enum.index(':').defined {
       die "The define-enum option must be of the form enumname:pattern";
   }
-  
+  $SILENT = $silent;
   if $gptfile.defined {
     read-gpt-file($gptfile);
     $gmerge-stypedef = $GPT::FileGenerator::merge-typedef-struct;
@@ -64,22 +70,22 @@ sub MAIN(
     }
   }
   if @files !== Empty {
-    note "Displaying content of : " ~ @files.join(', ');
+    gpt-note "Displaying content of : " ~ @files.join(', ');
   }
   if @user-excludes !== Empty {
-    note "Excluding content of : " ~ @user-excludes.join(', ');
+    gpt-note "Excluding content of : " ~ @user-excludes.join(', ');
   }
   
   my AllTheThings $att = do-magic($header-file, @gccoptions);
-  note 'Number of things founds';
-  note '-Types: ' ~ $att.types.elems;
-  note '-Structures: ' ~ $att.structs.elems;
-  note '-Unions: ' ~ $att.unions.elems;
-  note '-Enums: ' ~ $att.enums.elems;
-  note '-Functions: ' ~ $att.functions.elems;
-  note '-Variables: ' ~ $att.variables.elems;
-  note '-Files: ' ~ $att.files.elems;
-  note "Time to generate stuff\n\n";
+  gpt-note 'Number of things founds';
+  gpt-note '-Types: ' ~ $att.types.elems;
+  gpt-note '-Structures: ' ~ $att.structs.elems;
+  gpt-note '-Unions: ' ~ $att.unions.elems;
+  gpt-note '-Enums: ' ~ $att.enums.elems;
+  gpt-note '-Functions: ' ~ $att.functions.elems;
+  gpt-note '-Variables: ' ~ $att.variables.elems;
+  gpt-note '-Files: ' ~ $att.files.elems;
+  gpt-note "Time to generate stuff\n\n";
 
   if $list-deps.defined {
     list-deps($att, $list-deps);
@@ -204,19 +210,19 @@ sub do-magic($header, @other) {
   my $t = now;
   if $CASTXML {
     my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', 'plop.xml', $header, |@other;
-    note "Calling castxml : " ~ @arg.join(' ');
+    gpt-note "Calling castxml : " ~ @arg.join(' ');
     run 'castxml', @arg;
   } else {
-    note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml ", |@other;
+    gpt-note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml ", |@other;
     run $GCC_XML,  $header, "-fxml=plop.xml", @other;
   }
   %times<gccxml> = now - $t;
   $t = now;
-  note "Parsing the XML file";
+  gpt-note "Parsing the XML file";
   my $xml = from-xml-file('plop.xml');
   %times<parse-xml> = now - $t;
   $t = now;
-  note "Doing magic";
+  gpt-note "Doing magic";
   
   
   for $xml.elements() -> $elem {
@@ -420,7 +426,7 @@ sub do-magic($header, @other) {
   }
   
   %times<magic> = now - $t;
-  note "Times -- gccxml: %times<gccxml> sec; xml parsing: %times<parse-xml> sec; magic: %times<magic>";
+  gpt-note "Times -- gccxml: %times<gccxml> sec; xml parsing: %times<parse-xml> sec; magic: %times<magic>";
    my $att = AllTheThings.new;
    $att.files = %files;
    $att.types = %types;
