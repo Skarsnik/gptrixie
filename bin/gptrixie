@@ -267,7 +267,7 @@ sub do-magic($header, @other) {
         %types{$t.id} = $t;
       }
       when 'ArrayType' {
-        my $size = $elem<max>.subst('u', '') eq "0xffffffffffffffff" ?? '' !! $elem<max>.subst('u', '') + 1;   
+        my $size = $elem<max>.subst('u', '') ~~ /"0xffffffffffffffff"/ ?? '' !! $elem<max>.subst('u', '') + 1;
         my ArrayType $t .= new(:id($elem<id>), :size($size));
         $t.ref-id = $elem<type>;
         %types{$t.id} = $t;
