@@ -89,6 +89,9 @@ sub	resolve-type($t, $cpt = 0, :$context = "Foo") is export {
     return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1, :$context) ~ ']';
     
   }
+  if $t ~~ ArrayType and $context eq "struct" and $t.size != 0 {
+    return 'NYIRP6(Array with size)';
+  }
   if $t ~~ ArrayType {
     return 'CArray[' ~ resolve-type($t.ref-type, $cpt + 1, :$context) ~ ']';
   }
@@ -214,7 +217,7 @@ sub dg-generate-structs is export {
     $p6gen = "class $u-name is repr('CUnion') is export \{\n";
     for $cu.members -> $m {
       my $has = ($m.type ~~ StructType) ?? 'HAS' !! 'has';
-      $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($m.type), $m.name, $m.type, $m.name);
+      $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($m.type, :context<struct>), $m.name, $m.type, $m.name);
       #$p6gen ~= "\t$has " ~ resolve-type($m.type) ~ "\t" ~ $m.name ~ "; # " ~ $m.type ~ ' ' ~ $m.name ~ "\n";
     }
     $p6gen ~= "}";
@@ -227,7 +230,7 @@ sub dg-generate-structs is export {
     for $s.fields -> $field {
       debug "--Field : " ~ $field.name ~ "    " ~ $field.type;
       my $has = ($field.type ~~ StructType | UnionType) ?? 'HAS' !! 'has';
-      $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($field.type), $field.name, $field.type, $field.name);
+      $p6gen ~= sprintf("\t%s %-30s\$.%s; # %s %s\n", $has, resolve-type($field.type, :context<struct>), $field.name, $field.type, $field.name);
     }
     $p6gen ~= "}";
     %toret{$s.name}<p6str> = $p6gen;
