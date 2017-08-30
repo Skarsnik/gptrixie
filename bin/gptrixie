@@ -15,8 +15,8 @@ my $SILENT = False;
 
 my $gmerge-stypedef;
 
-sub gpt-note ($msg) {
-   note $msg unless $SILENT;
+sub gpt-note (*@msg) {
+   note |@msg unless $SILENT;
 }
 
 sub MAIN(
