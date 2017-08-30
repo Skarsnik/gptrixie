@@ -61,7 +61,7 @@ class QualifiedType is IndirectType is export {
 class TypeDefType is IndirectType does CLocation is export {
   has $.name is rw;
   method Str {
-    return "Typedef<$!name>->|" ~  $.ref-type.Str ~ "|";
+    return "Typedef<$!name>->«" ~  $.ref-type.Str ~ "»";
   }
 }
 
