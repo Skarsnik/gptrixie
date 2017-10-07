@@ -7,3 +7,5 @@ perl6:
 sudo: false
 install:
     - rakudobrew build-zef && zef install .
+    - zef install Test::META
+    - perl6 rt/00-test-meta.t

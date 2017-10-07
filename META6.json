@@ -5,7 +5,7 @@
     "version"       : "0.21",
     "description"   : "Generate NativeCall code from C headers file",
     "authors"        : ["Sylvain 'Skarsnik' Colinet <scolinet@gmail.com>"],
-    "depends"       : [ "XML", "Test::Meta"],
+    "depends"       : [ "XML" ],
     "provides"      : {
         "GPT::Class"		 : "lib/GPT/Class.pm6",
         "GPT::DumbGenerator"     : "lib/GPT/DumbGenerator.pm6",
