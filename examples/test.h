@@ -12,12 +12,13 @@ typedef struct s1 {
   float	b;
   double	c;
   char *d;
-};
+} s42;
 
 struct s2 {
-  s1	a;
+  struct s1	a;
+  s42		aa;
   my64bits	b;
-  int	c[];
+  int	c[99];
   double	d[4];
 };
 
@@ -28,11 +29,11 @@ struct s3 {
 };
 
 void	pretty_print(const char *toprint);
-void	*do_stuff(s1 s, 
+void	*do_stuff(struct s1 s, 
 	  size_t piko,
 	  bool b,
 	  const char** const plo
  		);
 
-int  flood(char &ref);
+int  flood(char *ref);
 void testhello(type2 n);

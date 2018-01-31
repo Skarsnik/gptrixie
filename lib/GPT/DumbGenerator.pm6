@@ -16,6 +16,7 @@ sub dg-init($allt) is export {
 my %ctype-to-p6 = (
 'bool'            => 'bool',
   '_bool'           => 'bool',
+  '_Bool'	    => 'bool',
 
   'char'            => 'int8',
   'signed char'     => 'int8',

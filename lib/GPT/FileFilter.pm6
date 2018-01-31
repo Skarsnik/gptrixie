@@ -13,6 +13,7 @@ sub files-filter($file-id, $file, @excluded, @selected?, :$context) returns Bool
     return False if $basename eq 'errno.h';
     return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/bits/'/;
     return False if $file ~~ /'/usr/include/'.+?'-linux-gnu/sys/'/;
+    return False if $file ~~ /'/castxml/clang/include/'/;
     
     if @selected !== Empty {
       my @files-list;
