@@ -281,8 +281,8 @@ sub do-magic($header, @other) {
       # == 'Real' Stuff
       when 'Field' {
         my $pf = Field.new();
-        $pf.set-clocation($elem);
-        $pf.file = %files{$pf.file-id};
+        #$pf.set-clocation($elem);
+        #$pf.file = %files{$pf.file-id};
         $pf.name = $elem<name>;
         $pf.type-id = $elem<type>;
         %fields{$elem<id>} = $pf;
