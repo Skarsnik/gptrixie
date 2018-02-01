@@ -224,12 +224,12 @@ sub do-magic($header, @other) {
   $t = now;
   gpt-note "Doing magic";
   
-  
+  for $xml.elements(:TAG<File>) -> $filef {
+     %files{$filef<id>} = $filef<name>;
+  }
+
   for $xml.elements() -> $elem {
     given $elem.name {
-      when 'File' {
-        %files{$elem<id>} = $elem<name>;
-      }
       # == Types
       when 'FundamentalType' {
         my FundamentalType $t .= new(:id($elem<id>));
