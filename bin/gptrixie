@@ -208,18 +208,19 @@ sub do-magic($header, @other) {
   my %times;
 
   my $t = now;
+  my $xml-output;
   if $CASTXML {
-    my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', 'plop.xml', $header, |@other;
+    my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', '-', $header, |@other;
     gpt-note "Calling castxml : " ~ @arg.join(' ');
-    run 'castxml', @arg;
+    $xml-output = run('castxml', @arg, :out).out.slurp;
   } else {
     gpt-note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml ", |@other;
-    run $GCC_XML,  $header, "-fxml=plop.xml", @other;
+    $xml-output = run($GCC_XML,  $header, "-fxml=-", @other, :out).out.slurp;
   }
   %times<gccxml> = now - $t;
   $t = now;
   gpt-note "Parsing the XML file";
-  my $xml = from-xml-file('plop.xml');
+  my $xml = from-xml($xml-output);
   %times<parse-xml> = now - $t;
   $t = now;
   gpt-note "Doing magic";
