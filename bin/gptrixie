@@ -212,7 +212,9 @@ sub do-magic($header, @other) {
   if $CASTXML {
     my @arg = '--castxml-gccxml', "-std=$CASTXML_STD", '-o', '-', $header, |@other;
     gpt-note "Calling castxml : " ~ @arg.join(' ');
-    $xml-output = run('castxml', @arg, :out).out.slurp;
+    my $prun = run('castxml', @arg, :out, :err);
+    die "Error with castxml : " ~ $prun.err.slurp if $prun.exitcode != 0;
+    $xml-output = $prun.out.slurp;
   } else {
     gpt-note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml ", |@other;
     $xml-output = run($GCC_XML,  $header, "-fxml=-", @other, :out).out.slurp;
