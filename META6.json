@@ -2,7 +2,7 @@
     "perl"          : "6.*",
     "name"          : "App::GPTrixie",
     "license"       : "Artistic-2.0",
-    "version"       : "0.27",
+    "version"       : "0.28",
     "description"   : "Generate NativeCall code from C headers file",
     "authors"        : ["Sylvain 'Skarsnik' Colinet <scolinet@gmail.com>"],
     "depends"       : [ "XML" ],

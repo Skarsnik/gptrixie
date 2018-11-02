@@ -214,6 +214,7 @@ sub do-magic($header, @other) {
     gpt-note "Calling castxml : " ~ @arg.join(' ');
     my $prun = run('castxml', @arg, :out, :err);
     die "Error with castxml : " ~ $prun.err.slurp if $prun.exitcode != 0;
+    $prun.err.slurp;
     $xml-output = $prun.out.slurp;
   } else {
     gpt-note "Calling GCCXML : $GCC_XML $header -fxml=plop.xml ", |@other;
