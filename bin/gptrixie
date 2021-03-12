@@ -296,7 +296,7 @@ sub do-magic($header, @other) {
       }
       when 'Struct' {
         my $s = Struct.new;
-        $s.name = $elem<name>.defined ?? $elem<name> !! $elem<mangled>; #FIXME
+        $s.name = $elem<name>.defined ?? $elem<name> !! $elem<mangled> ?? $elem<mangled> !! 'anon_struct' ~ $elem<id>; #FIXME
         $s.id = $elem<id>;
         $s.set-clocation($elem);
         $s.file = %files{$s.file-id};
