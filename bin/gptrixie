@@ -325,7 +325,6 @@ sub do-magic($header, @other) {
           $u = AnonymousUnion.new(:id($elem<id>));
           $u.struct = %structs{$elem<context>};
         }
-        say $t.id, $u.WHAT;
         $u.set-clocation($elem);
         %cunions{$u.id} = $u;
       }
@@ -434,10 +433,10 @@ sub do-magic($header, @other) {
     $v.type = %types{$v.type-id};
     #say $v.name ~ ' - ' ~ $v.type;
   }
-  say "Before FIX";
-  for %structs.kv -> $id, $s {
-      say "ID : ", $id, " name = ", $s.name
-  }
+  #say "Before FIX";
+  #for %structs.kv -> $id, $s {
+  #    say "ID : ", $id, " name = ", $s.name
+  #}
 
   sub fix-struct-name { # CASTXML does not give a name to struct defined like typedef struct {} name
       # Also does not give nice name to anonymous struct in union
