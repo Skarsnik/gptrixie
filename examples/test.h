@@ -24,6 +24,16 @@ struct s2 {
 
 typedef struct s2 type2;
 
+typedef struct {
+union {
+	char	charunion;
+	struct {
+		int a;
+		int b;
+	};
+      } tunion;
+} SWUnion;
+
 struct s3 {
   type2 foo;
 };

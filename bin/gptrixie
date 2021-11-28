@@ -193,10 +193,11 @@ sub MAIN(
   }
 }
 
-
+my constant $PLACEHOLDER = "GPTRIXIE_FIXME";
 
 sub do-magic($header, @other) {
   my %types;
+  my @typedefs;
   my %fields;
   my %structs;
   my @cfunctions;
@@ -270,6 +271,7 @@ sub do-magic($header, @other) {
         $t.ref-type = %types{$t.ref-id} if %types{$t.ref-id}:exists;
         $t.name = $elem<name>;
         %types{$t.id} = $t;
+        @typedefs.push($t);
       }
       when 'ArrayType' {
         my $size = $elem<max>.subst('u', '') ~~ /"0xffffffffffffffff"/ ?? '' !! $elem<max>.subst('u', '') + 1;
@@ -296,8 +298,10 @@ sub do-magic($header, @other) {
       }
       when 'Struct' {
         my $s = Struct.new;
-        $s.name = $elem<name>.defined ?? $elem<name> !! $elem<mangled> ?? $elem<mangled> !! 'anon_struct' ~ $elem<id>; #FIXME
+        $s.name = $elem<name>.defined ?? $elem<name> !! $elem<mangled>;
+        $s.name = $PLACEHOLDER if !$s.name.defined || $s.name eq '';
         $s.id = $elem<id>;
+        #say "Struct : ", $s.id ~ $s.name;
         $s.set-clocation($elem);
         $s.file = %files{$s.file-id};
         %structs{$s.id} = $s;
@@ -314,13 +318,14 @@ sub do-magic($header, @other) {
         %types{$t.id} = $t;
         $t.set-clocation($elem);
         my $u;
-        with $elem<name> {
+        if $elem<name>.defined and $elem<name> ne "" {
           $u = CUnion.new(:id($elem<id>));
           $u.name = $elem<name>;
         } else {
           $u = AnonymousUnion.new(:id($elem<id>));
           $u.struct = %structs{$elem<context>};
-        }      
+        }
+        say $t.id, $u.WHAT;
         $u.set-clocation($elem);
         %cunions{$u.id} = $u;
       }
@@ -367,27 +372,27 @@ sub do-magic($header, @other) {
 
   #We probably can resolve every type now.
   sub resolvetype {
-    my $change = True; #Do something like bubble sort, until we solve everytype, let's boucle
-    while ($change) {
-      $change = False;
-      for %types.kv -> $id, $t {
-	if $t ~~ IndirectType {
-	  unless $t.ref-type:defined {
-	    #say "Found an undef indirect id: "~ $t.ref-id;
-	    $t.ref-type = %types{$t.ref-id};
-	    $change = True;
-	  }
-	CATCH {
-		default {
-			say $t.perl;
-		}
-	}
-	}
+      my $change = True; #Do something like bubble sort, until we solve everytype, let's boucle
+      while ($change) {
+          $change = False;
+          for %types.kv -> $id, $t {
+              if $t ~~ IndirectType {
+                  unless $t.ref-type:defined {
+                      #say "Found an undef indirect id: "~ $t.ref-id;
+                      $t.ref-type = %types{$t.ref-id};
+                      $change = True;
+                  }
+                  CATCH {
+                      default {
+                          say $t.raku;
+                      }
+                  }
+              }
+          }
       }
-    }
   }
-  resolvetype();
-  
+    resolvetype();
+
   sub merge-stypedef {
     for %types.kv -> $id, $t {
       if $t ~~ TypeDefType and $t.ref-type ~~ StructType {
@@ -429,7 +434,61 @@ sub do-magic($header, @other) {
     $v.type = %types{$v.type-id};
     #say $v.name ~ ' - ' ~ $v.type;
   }
-  
+  say "Before FIX";
+  for %structs.kv -> $id, $s {
+      say "ID : ", $id, " name = ", $s.name
+  }
+
+  sub fix-struct-name { # CASTXML does not give a name to struct defined like typedef struct {} name
+      # Also does not give nice name to anonymous struct in union
+      #say "fix stuff";
+      for %structs.keys -> $id {
+          next if %structs{$id} !~~ Struct;
+#          say "Id: ", $id, "name", %structs{$id}.name;
+          if %structs{$id}.name eq $PLACEHOLDER {
+              # Merging typedef struct {}
+              for @typedefs -> $td {
+                  if $td.ref-id eq $id {
+ #                     say "merging struct ", $id , " with typedef ", $td.id;
+                      %structs{$id}.name = $td.name;
+                      %structs{$id}.id = $td.id;
+                      %types{$id}.id = $td.id;
+                      %types{$id}.name = $td.name;
+                      %types{$td.id} = %types{$id};
+                      %types{$id}:delete;
+                      %structs{$td.id} = %structs{$id};
+                      %structs{$id}:delete;
+                      @typedefs.splice(@typedefs.first($td, :k), 1);
+                      last;
+                  }
+              }
+          }
+      }
+      # anonym union
+      for %cunions.kv -> $id, $union {
+          #say "Union : " ~ $union.id;
+          for $union.members -> $field {
+              #say "Field : " ~ $field.name ~ $field.type.id;
+              if $field.type ~~ StructType {
+                  #say "Find struct type in " ~ $union.name;
+                  if %structs{$field.type.id}.name eq $PLACEHOLDER {
+                      if $union !~~ AnonymousUnion {
+                          %structs{$field.type.id}.name =
+                                  $union.name ~ "_anonymousStruct" ~ $field.type.id;
+                          %types{$field.type.id} = %structs{$field.type.id}.name;
+                      } else {
+                          %structs{$field.type.id}.name =
+                                  "anonymousUnion{$id}_anonymousStruct" ~ $field.type.id;
+                          %types{$field.type.id} = %structs{$field.type.id}.name;
+                      }
+                  }
+              }
+          }
+      }
+  }
+  fix-struct-name();
+  #say $_.id, " : ", $_.name  for %structs.values;
+  #exit 1;
   %times<magic> = now - $t;
   gpt-note "Times -- gccxml: %times<gccxml> sec; xml parsing: %times<parse-xml> sec; magic: %times<magic>";
    my $att = AllTheThings.new;

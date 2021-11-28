@@ -8,6 +8,7 @@ sub files-filter($file-id, $file, @excluded, @selected?, :$context) returns Bool
     #Autoexclude stuff
     return False if $basename ~~ /^std/;
     return False if $basename eq '<builtin>';
+    return False if $file eq '&lt;builtin&gt;'; # This is castxml builtin file
     return False if $basename ~~ /^pthread/;
     return False if $basename eq 'libio.h';
     return False if $basename eq 'string.h';

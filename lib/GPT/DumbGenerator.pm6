@@ -63,16 +63,12 @@ my %stdinttype-to-p6 = (
 
 
 sub	resolve-type($t, $cpt = 0, :$context = "Foo") is export {
-  debug "==" x $cpt ~ $t.id ~ ' ' ~ $t.WHAT.perl ~ ' ' ~ $t;
+  debug "==" x $cpt ~ $t.id ~ ' ' ~ $t.WHAT.perl ~ ' ' ~ $t.Str;
   if $t ~~ PointerType {
     debug "ref-type : " ~ $t.ref-type.id ~ '/'  ~ $t.ref-id ~ ' '~ $t.ref-type.WHAT.perl ~ " - " ~ $t.ref-type;
-    if $t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void' {
-      return $t.ref-type.name ~ 'Ptr';
-    }
-    return 'Str' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'char') ||
-      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'char');
-    return 'Pointer' if ($t.ref-type ~~ FundamentalType and $t.ref-type.name eq 'void') ||
-      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ FundamentalType and $t.ref-type.ref-type.name eq 'void');
+    return $t.ref-type.name ~ 'Ptr' if $t.ref-type type-eq <typedef void>;
+    return 'Str' if $t type-eq (<Ptr char> | <Ptr const char>);
+    return 'Pointer' if $t.ref-type type-eq (<void> | <const void>);
     if $t.ref-type ~~ FunctionType {
       if $context eq 'function' {
         return '(' ~ ($t.ref-type.arguments-type.map:{resolve-type($_)}).join(', ') ~ 
@@ -83,10 +79,7 @@ sub	resolve-type($t, $cpt = 0, :$context = "Foo") is export {
         return 'Pointer';
       }
     }
-    return resolve-type($t.ref-type, $cpt + 1) if ($t.ref-type ~~ StructType) ||
-      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ StructType) ||
-      ($t.ref-type ~~ TypeDefType and $t.ref-type.ref-type ~~ StructType) ||
-      ($t.ref-type ~~ QualifiedType and $t.ref-type.ref-type ~~ TypeDefType and $t.ref-type.ref-type.ref-type ~~ StructType);
+    return resolve-type($t.ref-type, $cpt + 1) if $t.ref-type type-eq (<struct> | <qualif struct> | <typedef struct> | <qualif typedef struct>);
     return 'Pointer[' ~ resolve-type($t.ref-type, $cpt + 1, :$context) ~ ']';
     
   }
